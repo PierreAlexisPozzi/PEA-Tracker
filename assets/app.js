@@ -37,8 +37,8 @@
     lastPrice: ['lastprice', 'cours', 'derniercours', 'coursactuel', 'dernier'],
     intradayVariation: ['intradayvariation', 'varjour', 'variationjour', 'varjour%', 'variationdujour'],
     amount: ['amount', 'montant', 'valorisation', 'montantestime', 'valeurestimee'],
-    amountVariation: ['amountvariation', '+/-value', '+/-values', 'plusmoinsvalue', 'pvlatente', '+/-valuelatente'],
-    variation: ['variation', '+/-%', 'perf', 'performance', 'var%']
+    amountVariation: ['amountvariation', '+/-value', '+/-values', 'plusmoinsvalue', 'pvlatente', '+/-valuelatente', '+/-valueslatentes', 'plusoumoinsvalue', 'pmvlatente'],
+    variation: ['variation', '+/-%', 'perf', 'performance', 'var%', 'var', '+/-value%', '+/-latente%']
   };
   const METRICS = {
     price: { label: 'Cours', unit: '€', scopes: ['line'] },
@@ -314,14 +314,81 @@
   /* ================================================================ Import */
 
   function readWorkbook(buf) {
-    if (!window.XLSX) throw new Error("La bibliothèque de lecture Excel n'a pas pu être chargée (connexion requise).");
+    if (!window.XLSX) throw new Error("La bibliothèque de lecture Excel n'a pas pu être chargée (connexion requise). Le format CSV reste lisible hors connexion.");
     const wb = window.XLSX.read(buf, { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    return window.XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });
+    return window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, blankrows: false });
   }
 
-  function normalizeRows(rows) {
-    const headers = rows.length ? Object.keys(rows[0]) : [];
+  /** UTF-8 si le fichier est valide, sinon Windows-1252 (exports Excel « CSV » français). */
+  function decodeText(buf) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); }
+  }
+
+  /**
+   * CSV → matrice de chaînes. Séparateur détecté (; tabulation ou ,) hors guillemets,
+   * sur les premières lignes. Les valeurs restent du texte : num() gère « 1 234,56 ».
+   */
+  function parseCsvText(text) {
+    text = String(text || '').replace(/^\uFEFF/, '');
+    const sample = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 10);
+    const countOut = (line, ch) => { let n = 0; let q = false; for (const c of line) { if (c === '"') q = !q; else if (!q && c === ch) n++; } return n; };
+    let sep = ';';
+    let best = -1;
+    [';', '\t', ','].forEach((ch) => { const n = Math.max.apply(null, sample.map((l) => countOut(l, ch)).concat([0])); if (n > best) { best = n; sep = ch; } });
+    const rows = [];
+    let row = [];
+    let field = '';
+    let q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c;
+      } else if (c === '"' && field.trim() === '') { q = true; field = ''; }
+      else if (c === sep) { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); rows.push(row); row = []; field = '';
+      } else field += c;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows.map((r) => r.map((v) => v.trim())).filter((r) => r.some((v) => v !== ''));
+  }
+
+  /** Matrice → objets, en cherchant la ligne d'en-tête (un export peut commencer par un titre). */
+  const ALL_SYNONYMS = new Set([].concat.apply([], Object.keys(COLS).map((k) => COLS[k])));
+  function matrixToRows(matrix) {
+    let hi = 0;
+    let best = -1;
+    matrix.slice(0, 15).forEach((r, i) => {
+      const n = (r || []).filter((c) => c != null && ALL_SYNONYMS.has(normKey(c))).length;
+      if (n > best) { best = n; hi = i; }
+    });
+    const seen = {};
+    const headers = (matrix[hi] || []).map((h, i) => {
+      let k = h == null || String(h).trim() === '' ? 'colonne ' + (i + 1) : String(h).trim();
+      if (seen[k]) k += ' (' + (++seen[k]) + ')'; else seen[k] = 1;
+      return k;
+    });
+    const rows = matrix.slice(hi + 1).map((r) => { const o = {}; headers.forEach((h, i) => { o[h] = r && r[i] !== undefined ? r[i] : null; }); return o; });
+    return { headers, rows };
+  }
+
+  /** Date du relevé lue dans le nom du fichier (20261010, 2026-10-10, 10-10-2026), sinon null. */
+  function dateFromName(name) {
+    const s = String(name || '');
+    let iso = null;
+    let m = s.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})(?!\d)/);
+    if (m) iso = m[1] + '-' + m[2] + '-' + m[3];
+    else { m = s.match(/(\d{2})[-_.](\d{2})[-_.](20\d{2})/); if (m) iso = m[3] + '-' + m[2] + '-' + m[1]; }
+    if (!iso) return null;
+    const d = new Date(iso + 'T00:00:00Z');
+    if (isNaN(d) || d.getUTCDate() !== +iso.slice(8) || iso > todayISO()) return null;
+    return iso;
+  }
+
+  function normalizeRows(rows, headerList) {
+    const headers = headerList || (rows.length ? Object.keys(rows[0]) : []);
     const map = {};
     Object.keys(COLS).forEach((field) => {
       const h = headers.find((x) => COLS[field].includes(normKey(x)));
@@ -330,11 +397,19 @@
     const required = ['name', 'isin', 'quantity', 'buyingPrice', 'lastPrice'];
     const missing = required.filter((f) => !map[f]);
     const positions = [];
+    const skipped = [];
+    let cash = null;
     if (!missing.length) {
       rows.forEach((r) => {
-        const isin = String(r[map.isin] || '').trim().toUpperCase();
-        const name = String(r[map.name] || '').trim();
+        const isin = String(r[map.isin] == null ? '' : r[map.isin]).replace(/\s/g, '').toUpperCase();
+        const name = String(r[map.name] == null ? '' : r[map.name]).trim();
         if (!isin && !name) return;
+        if (isin.length !== 12) {
+          // Ligne de total, de solde espèces ou de sous-titre : pas une position.
+          if (/esp[eè]ces|liquidit|solde/i.test(name)) { const v = num(map.amount ? r[map.amount] : null); if (ok(v)) cash = v; }
+          skipped.push(name || isin);
+          return;
+        }
         positions.push({
           name, isin,
           qty: num(r[map.quantity]), pru: num(r[map.buyingPrice]), last: num(r[map.lastPrice]),
@@ -345,7 +420,7 @@
         });
       });
     }
-    return { headers, map, missing, positions };
+    return { headers, map, missing, positions, skipped, cash };
   }
 
   /** Contrôles qualité d'un relevé (colonnes, ISIN, doublons, cohérence des montants). */
@@ -358,7 +433,7 @@
         : { id: 'Q1', title: 'Colonnes reconnues', status: 'ok', detail: found + ' colonnes reconnues sur ' + parsed.headers.length + '.' });
     }
     out.push(positions.length
-      ? { id: 'Q2', title: 'Lignes lues', status: 'ok', detail: positions.length + ' lignes de position.' }
+      ? { id: 'Q2', title: 'Lignes lues', status: 'ok', detail: positions.length + ' lignes de position.' + (parsed && parsed.skipped && parsed.skipped.length ? ' Ignorées (pas des positions) : ' + parsed.skipped.join(', ') + '.' : '') }
       : { id: 'Q2', title: 'Lignes lues', status: 'alert', detail: 'Aucune ligne exploitable dans le fichier.' });
     const badIsin = positions.filter((p) => !isinValid(p.isin));
     out.push({ id: 'Q3', title: 'Codes ISIN valides', status: badIsin.length ? 'alert' : 'ok', detail: badIsin.length ? 'Clé de contrôle invalide : ' + badIsin.map((p) => p.name + ' (' + p.isin + ')').join(', ') : 'Clé de contrôle vérifiée pour chaque ISIN.' });
@@ -828,7 +903,7 @@
       return '<div class="empty"><h2>Chargement…</h2><p class="muted">Récupération de vos relevés enregistrés.</p></div>';
     }
     return '<div class="empty"><span class="eyebrow">Premier pas</span><h2>Importez votre export BoursoBank</h2>' +
-      '<p class="muted">Dans votre espace BoursoBank, exportez les positions de votre PEA au format Excel (.xlsx), puis importez le fichier ici. ' +
+      '<p class="muted">Dans votre espace BoursoBank, exportez les positions de votre PEA (CSV ou Excel), puis importez le fichier ici, ou glissez-le sur la page. ' +
       'Les contrôles, alertes, mouvements et avis des analystes se calculent automatiquement.</p>' +
       '<div class="actions"><button class="btn primary" type="button" data-act="import">Importer un relevé</button>' +
       '<button class="btn" type="button" data-act="demo">Voir un exemple fictif</button></div></div>';
@@ -836,6 +911,22 @@
 
   function demoBanner() {
     return S.demo ? '<div class="banner"><span><b>Exemple fictif.</b> Ces positions ne sont pas les vôtres.</span><button class="btn sm" type="button" data-act="exit-demo">Quitter l’exemple</button></div>' : '';
+  }
+
+  /* ---------------- Zone de mise à jour */
+
+  function updateCard() {
+    if (S.demo) return '';
+    const last = S.snapshots.length ? S.snapshots[S.snapshots.length - 1] : null;
+    const age = last ? daysSince(last.date) : null;
+    const stale = age != null && age > 7;
+    const when = last ? 'Dernier relevé : ' + dateFR(last.date) + (age > 0 ? ' (il y a ' + age + ' j)' : ' (aujourd’hui)') : 'Aucun relevé enregistré';
+    return '<section class="drop update' + (stale ? ' stale' : '') + '" aria-labelledby="updTitle">' +
+      '<div class="update-text"><b id="updTitle">Mettre à jour mon relevé</b>' +
+      '<span class="small">' + esc(when) + (stale ? ' · <b>à mettre à jour</b>' : '') + '</span>' +
+      '<span class="small muted">Glissez ici le fichier CSV (ou Excel) exporté de BoursoBank, ou choisissez-le.</span></div>' +
+      '<div class="actions"><button class="btn primary" type="button" data-act="pick"' + (S.readOnly ? ' disabled' : '') + '>Choisir le fichier CSV</button>' +
+      '<button class="btn" type="button" data-act="paste"' + (S.readOnly ? ' disabled' : '') + '>Coller le contenu</button></div></section>';
   }
 
   /* ---------------- Synthèse */
@@ -884,7 +975,7 @@
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
       '</tbody></table></div><p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
 
-    return demoBanner() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
+    return demoBanner() + updateCard() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
   }
 
   /* ---------------- Positions */
@@ -1005,7 +1096,7 @@
     const nW = C.filter((c) => c.status === 'warn').length;
     const hits = AL.filter((x) => x.a.active !== false && x.hit).length;
     const steps = [
-      ['Export BoursoBank', 'Fichier Excel des positions du PEA.', snap ? chip('ok', 'Reçu') : chip('info', 'En attente')],
+      ['Export BoursoBank', 'Fichier CSV ou Excel des positions du PEA.', snap ? chip('ok', 'Reçu') : chip('info', 'En attente')],
       ['Lecture et contrôles qualité', 'Colonnes, ISIN, doublons, cohérence des montants.', snap ? chip(qBad ? 'warn' : 'ok', qBad ? qBad + ' anomalie(s)' : q.length + ' contrôles OK') : ''],
       ['Historisation', 'Un relevé daté par import.', snap ? chip('ok', S.demo ? 'Exemple' : S.snapshots.length + ' relevé(s)') : ''],
       ['Mouvements', 'Achats, renforcements, allègements, ventes déduits.', snap ? chip(prev ? 'ok' : 'info', prev ? mv + ' mouvement' + (mv > 1 ? 's' : '') : 'Premier relevé') : ''],
@@ -1098,20 +1189,29 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
-  function importSheet() {
+  function pasteBlock(open) {
+    return '<details class="paste"' + (open ? ' open' : '') + '><summary>Ou coller le contenu du fichier CSV</summary>' +
+      '<p class="small muted">Ouvrez le fichier CSV, copiez tout son contenu (en-tête compris) et collez-le ici.</p>' +
+      '<textarea class="input" id="imp-paste" rows="6" spellcheck="false" placeholder="name;isin;quantity;buyingPrice;lastPrice;…"></textarea>' +
+      '<div class="actions"><button class="btn" type="button" data-act="parse-paste">Analyser le texte collé</button></div></details>';
+  }
+
+  function importSheet(opts) {
     if (S.readOnly) { toast('Lecture seule : import impossible depuis cette vue.'); return; }
+    opts = opts || {};
     const p = S.pending;
-    let body = '<div class="sheet-head"><div><span class="eyebrow">Étapes 1 à 6</span><h2 id="sheetTitle">Importer un relevé</h2></div><button class="btn" type="button" data-act="close">Fermer</button></div>';
+    let body = '<div class="sheet-head"><div><span class="eyebrow">Étapes 1 à 6</span><h2 id="sheetTitle">Mettre à jour mon relevé</h2></div><button class="btn" type="button" data-act="close">Fermer</button></div>';
     if (!p) {
-      body += '<div class="drop" id="drop"><b>Déposez ici votre export BoursoBank</b><span class="small muted">Fichier .xlsx des positions du PEA (ou .csv)</span><button class="btn primary" type="button" data-act="pick">Choisir le fichier</button></div>' +
+      body += '<div class="drop"><b>Déposez ici votre export BoursoBank</b><span class="small muted">Fichier CSV (.csv) ou Excel (.xlsx) des positions du PEA</span><button class="btn primary" type="button" data-act="pick">Choisir le fichier</button></div>' +
+        pasteBlock(opts.paste) +
         '<p class="small muted">Le fichier est lu dans votre navigateur. Seules les positions sont enregistrées.</p>';
     } else if (p.error) {
-      body += '<div class="ctrl alert"><span class="stripe"></span><div class="body"><span class="title">Lecture impossible</span><p class="detail">' + esc(p.error) + '</p></div></div><div class="actions"><button class="btn" type="button" data-act="pick">Choisir un autre fichier</button></div>';
+      body += '<div class="ctrl alert"><span class="stripe"></span><div class="body"><span class="title">Lecture impossible</span><p class="detail">' + esc(p.error) + '</p></div></div><div class="actions"><button class="btn" type="button" data-act="pick">Choisir un autre fichier</button></div>' + pasteBlock(false);
     } else {
       const blocking = p.checks.some((c) => c.status === 'alert' && (c.id === 'Q1' || c.id === 'Q2'));
       const A = blocking ? null : analyze(p.snap);
       const exists = S.snapshots.some((s) => s.id === p.snap.id);
-      body += '<p class="small"><b>' + esc(p.fileName) + '</b></p><div class="checklist">' + p.checks.map((c) => '<div class="item">' + chip(c.status) + '<div><b>' + esc(c.title) + '</b><p class="d">' + esc(c.detail) + '</p></div></div>').join('') + '</div>';
+      body += '<p class="small"><b>' + esc(p.fileName) + '</b> <span class="muted">· ' + esc(p.format || '') + '</span></p><div class="checklist">' + p.checks.map((c) => '<div class="item">' + chip(c.status) + '<div><b>' + esc(c.title) + '</b><p class="d">' + esc(c.detail) + '</p></div></div>').join('') + '</div>';
       if (A) {
         const prev = S.snapshots.filter((s) => s.date < p.snap.date).slice(-1)[0] || null;
         const flows = diffSnapshots(prev, p.snap);
@@ -1130,24 +1230,33 @@
       }
     }
     openSheet(body);
-    const drop = $('#drop');
-    if (drop) {
-      drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
-      drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-      drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
-    }
+    if (opts.paste && $('#imp-paste')) $('#imp-paste').focus();
+  }
+
+  function preparePending(fileName, matrix, format) {
+    const table = matrixToRows(matrix);
+    const parsed = normalizeRows(table.rows, table.headers);
+    const date = dateFromName(fileName) || todayISO();
+    const snap = { id: date, date, source: 'Export BoursoBank (' + format + ')', fileName, cash: ok(parsed.cash) ? parsed.cash : null, positions: parsed.positions };
+    S.pending = { fileName, format, parsed, snap, checks: qualityChecks(parsed.positions, parsed) };
   }
 
   async function handleFile(file) {
+    if (S.readOnly) { toast('Lecture seule : import impossible depuis cette vue.'); return; }
     try {
+      const isText = /\.(csv|txt)$/i.test(file.name) || /^text\//.test(file.type || '');
       const buf = await file.arrayBuffer();
-      const rows = readWorkbook(buf);
-      const parsed = normalizeRows(rows);
-      const snap = { id: todayISO(), date: todayISO(), source: 'Export BoursoBank', fileName: file.name, cash: null, positions: parsed.positions };
-      S.pending = { fileName: file.name, parsed, snap, checks: qualityChecks(parsed.positions, parsed) };
+      preparePending(file.name, isText ? parseCsvText(decodeText(buf)) : readWorkbook(buf), isText ? 'CSV' : 'Excel');
     } catch (e) {
       S.pending = { fileName: file.name, error: (e && e.message) || 'Fichier illisible.' };
     }
+    importSheet();
+  }
+
+  function handlePaste() {
+    const txt = ($('#imp-paste') && $('#imp-paste').value) || '';
+    if (!txt.trim()) { toast('Collez d’abord le contenu du fichier CSV.'); return; }
+    try { preparePending('Texte collé', parseCsvText(txt), 'CSV'); } catch (e) { S.pending = { fileName: 'Texte collé', error: (e && e.message) || 'Texte illisible.' }; }
     importSheet();
   }
 
@@ -1282,7 +1391,9 @@
       switch (t.dataset.act || t.id) {
         case 'btnImport': case 'import': S.pending = null; return importSheet();
         case 'btnSettings': case 'settings': return settingsSheet();
-        case 'pick': return $('#fileInput').click();
+        case 'pick': if (S.readOnly) { toast('Lecture seule : import impossible depuis cette vue.'); return; } return $('#fileInput').click();
+        case 'paste': S.pending = null; return importSheet({ paste: true });
+        case 'parse-paste': return handlePaste();
         case 'commit': return commitImport();
         case 'close': return closeSheet();
         case 'demo': S.demo = demoSnapshot(); return renderAll();
@@ -1386,6 +1497,19 @@
       const el = e.target.closest && e.target.closest('[data-tip]');
       if (el && el.dataset.tip) { const r = el.getBoundingClientRect(); showTip(el.dataset.tip, r.left + r.width / 2, r.bottom); } else hideTip();
     });
+    const hasFiles = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
+    let dragDepth = 0;
+    document.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; dragDepth++; document.body.classList.add('dragging'); });
+    document.addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) document.body.classList.remove('dragging'); });
+    document.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+    document.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth = 0;
+      document.body.classList.remove('dragging');
+      const f = e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
     window.addEventListener('scroll', hideTip, { passive: true });
     let rz = null;
     window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.tab === 'flux') drawHistory(); }, 150); });
@@ -1409,7 +1533,7 @@
   }
 
   // Exposé pour les tests automatisés (aucun effet sur l'interface).
-  window.PEA_TRACKER = { isinValid, normalizeRows, qualityChecks, diffSnapshots, analyze, runControls, evalAlert, ideaScore, num };
+  window.PEA_TRACKER = { isinValid, normalizeRows, qualityChecks, diffSnapshots, analyze, runControls, evalAlert, ideaScore, num, parseCsvText, matrixToRows, dateFromName };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

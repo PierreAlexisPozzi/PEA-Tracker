@@ -4,14 +4,23 @@ Tableau de bord de suivi d'un PEA BoursoBank : import de l'export des positions,
 contrôles visuels, alertes, journal des mouvements, avis des analystes sur chaque
 ligne et idées de mid caps éligibles PEA.
 
-Page statique, sans serveur ni build : HTML, CSS et JavaScript, avec
-[SheetJS](https://sheetjs.com) chargé depuis cdnjs pour lire le fichier Excel.
+Page statique, sans serveur ni build : HTML, CSS et JavaScript. Les fichiers CSV sont
+lus par l'application elle-même ; [SheetJS](https://sheetjs.com), chargé depuis cdnjs,
+sert uniquement aux fichiers Excel.
 
 ## Utilisation
 
-1. Dans l'espace BoursoBank, exporter les positions du PEA au format Excel (`.xlsx`).
-2. Ouvrir `index.html` (double-clic, ou via GitHub Pages), puis **Importer un relevé**.
-3. Vérifier les contrôles qualité affichés, choisir la date du relevé, enregistrer.
+1. Dans l'espace BoursoBank, exporter les positions du PEA en CSV (ou Excel `.xlsx`).
+2. Ouvrir `index.html` (double-clic, ou via GitHub Pages). En haut de la Synthèse, la zone
+   **Mettre à jour mon relevé** accepte le fichier de trois façons : glisser-déposer
+   (n'importe où sur la page), **Choisir le fichier CSV**, ou **Coller le contenu** du CSV.
+3. Vérifier les contrôles qualité affichés et la date du relevé (reprise du nom du fichier
+   quand il en contient une), puis enregistrer.
+
+Lecture du CSV : séparateur `;`, `,` ou tabulation détecté automatiquement, décimales à
+virgule ou à point, encodage UTF-8 ou Windows-1252, en-têtes anglais (`name;isin;quantity;…`)
+ou français (`Libellé;Code ISIN;Quantité;PRU;Cours;…`). Les lignes de titre, de total et
+de solde espèces sont ignorées ; le solde espèces pré-remplit les liquidités.
 
 À chaque nouvel import, l'application compare le relevé au précédent et en déduit
 les mouvements (achat, renforcement, allègement, vente), réévalue les contrôles et
@@ -61,8 +70,8 @@ vigilance quand les consensus ont plus de 60 jours.
 ## Scripts
 
 ```bash
-# Vérifier / convertir un export BoursoBank en relevé JSON (forme d'un document snapshots/<date>)
-python3 scripts/boursobank_to_json.py export.xlsx --date 2026-10-03 --cash 85.40 > releve.json
+# Vérifier / convertir un export BoursoBank (.csv ou .xlsx) en relevé JSON (document snapshots/<date>)
+python3 scripts/boursobank_to_json.py export.csv --date 2026-10-03 --cash 85.40 > releve.json
 
 # Assembler la page en un seul fichier autonome (scripts en ligne) pour la publier
 python3 scripts/build_artifact.py --out dist/pea-tracker.html
