@@ -1,0 +1,83 @@
+# PEA Tracker
+
+Tableau de bord de suivi d'un PEA BoursoBank : import de l'export des positions,
+contrôles visuels, alertes, journal des mouvements, avis des analystes sur chaque
+ligne et idées de mid caps éligibles PEA.
+
+Page statique, sans serveur ni build : HTML, CSS et JavaScript, avec
+[SheetJS](https://sheetjs.com) chargé depuis cdnjs pour lire le fichier Excel.
+
+## Utilisation
+
+1. Dans l'espace BoursoBank, exporter les positions du PEA au format Excel (`.xlsx`).
+2. Ouvrir `index.html` (double-clic, ou via GitHub Pages), puis **Importer un relevé**.
+3. Vérifier les contrôles qualité affichés, choisir la date du relevé, enregistrer.
+
+À chaque nouvel import, l'application compare le relevé au précédent et en déduit
+les mouvements (achat, renforcement, allègement, vente), réévalue les contrôles et
+les alertes.
+
+## Ce que fait chaque onglet
+
+| Onglet | Contenu |
+|---|---|
+| Synthèse | Valeur, +/- value (avec et sans titres radiés), indice de santé, actions prioritaires, répartition (type, zones, secteurs), performance par ligne, avis des analystes |
+| Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne |
+| Contrôles | 22 contrôles en vert / orange / rouge : qualité du relevé, concentration, pertes, titres radiés, socle diversifié, doublons titres/ETF, analystes, cadre PEA |
+| Alertes | Seuils sur le cours, la +/- value, le poids, la variation du jour, le potentiel, un secteur ou le portefeuille ; alertes recommandées en un clic |
+| Flux | Chaîne de traitement d'un relevé, évolution de la valeur, plafond des versements (150 000 €), journal des mouvements, relevés enregistrés |
+| Idées mid caps | Valeurs moyennes non détenues avec consensus à l'achat, classées par un score sur 100 |
+
+### Lecture du consensus
+
+Échelle FactSet affichée par Boursorama : 1 = Acheter, 2 = Renforcer, 3 = Conserver,
+4 = Alléger, 5 = Vendre. Pour un détenteur, une note médiane ≤ 2,5 se lit
+**Renforcer**, ≤ 3,5 **Conserver**, ≤ 4,5 **Alléger**, au-delà **Vendre**.
+
+### Score des idées
+
+`0,4 × potentiel (plafonné à 60 %) + 0,3 × force du consensus + 0,2 × valorisation (PER 2026e) + 0,1 × nombre d'analystes`.
+C'est un indicateur de tri, pas une recommandation.
+
+## Données et confidentialité
+
+Ce dépôt est **public** : il ne contient aucune donnée personnelle.
+
+- `data/research.js` : uniquement des données de marché publiques (consensus, objectifs,
+  métadonnées des instruments, idées). Date de mise à jour dans `asOf`.
+- Les relevés, alertes, mouvements et réglages restent dans le navigateur
+  (`localStorage`). Une sauvegarde JSON est disponible dans **Réglages**.
+- Publiée comme artifact claude.ai, la page enregistre ces données dans la base privée
+  de l'artifact : elles sont accessibles sur tous les appareils, et Claude peut les relire
+  pour mettre à jour l'analyse.
+- `.gitignore` exclut les exports `.xlsx` / `.csv` et le dossier `dist/`.
+
+## Mettre à jour la recherche
+
+Modifier `data/research.js` (bloc `consensus` d'une valeur, `asOf`), ou demander à
+Claude de le faire à partir des consensus du moment. Le contrôle P13 passe en
+vigilance quand les consensus ont plus de 60 jours.
+
+## Scripts
+
+```bash
+# Vérifier / convertir un export BoursoBank en relevé JSON (forme d'un document snapshots/<date>)
+python3 scripts/boursobank_to_json.py export.xlsx --date 2026-10-03 --cash 85.40 > releve.json
+
+# Assembler la page en un seul fichier autonome (scripts en ligne) pour la publier
+python3 scripts/build_artifact.py --out dist/pea-tracker.html
+```
+
+## Structure
+
+```
+index.html              page, styles et balisage
+assets/app.js           import, contrôles, alertes, flux, graphiques, stockage
+data/research.js        base de recherche publique (consensus, idées)
+scripts/                conversion de l'export, assemblage de la page autonome
+```
+
+## Avertissement
+
+Outil d'aide à la décision, pas un conseil en investissement personnalisé. Les
+consensus d'analystes sont datés et souvent révisés ; les vérifier avant toute opération.

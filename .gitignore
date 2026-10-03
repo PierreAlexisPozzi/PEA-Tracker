@@ -1,0 +1,11 @@
+# Exports de positions : données personnelles, jamais dans le dépôt public
+*.xlsx
+*.xls
+*.csv
+data/private/
+
+# Page assemblée (scripts/build_artifact.py)
+dist/
+
+__pycache__/
+.DS_Store
