@@ -30,12 +30,29 @@ les alertes.
 
 | Onglet | Contenu |
 |---|---|
-| Synthèse | Valeur, +/- value (avec et sans titres radiés), indice de santé, actions prioritaires, répartition (type, zones, secteurs), performance par ligne, avis des analystes |
+| Synthèse | Zone « Mettre à jour mon relevé », dernière analyse, valeur, +/- value (avec et sans titres radiés), indice de santé, actions prioritaires, répartition, performance par ligne, avis des analystes |
+| Analyse | Rapport créé à chaque import ou à la demande : ce qui a changé, plan d'action, prochain versement, commentaire ligne par ligne, commentaire rédigé par Claude ; historique des analyses |
 | Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne |
 | Contrôles | 22 contrôles en vert / orange / rouge : qualité du relevé, concentration, pertes, titres radiés, socle diversifié, doublons titres/ETF, analystes, cadre PEA |
 | Alertes | Seuils sur le cours, la +/- value, le poids, la variation du jour, le potentiel, un secteur ou le portefeuille ; alertes recommandées en un clic |
 | Flux | Chaîne de traitement d'un relevé, évolution de la valeur, plafond des versements (150 000 €), journal des mouvements, relevés enregistrés |
 | Idées mid caps | Valeurs moyennes non détenues avec consensus à l'achat, classées par un score sur 100 |
+
+### Analyses
+
+Une nouvelle analyse est faite à chaque fois :
+
+- **à chaque import** : la page crée automatiquement l'analyse chiffrée du relevé (comparée au
+  relevé précédent) puis, dans l'artifact claude.ai, demande à Claude d'en rédiger un
+  commentaire (capacité `sample`, sur le compte Claude de l'utilisateur ; option dans Réglages) ;
+- **à la demande dans la page** : bouton « Nouvelle analyse » de l'onglet Analyse ;
+- **à la demande dans une conversation avec Claude** : le skill
+  `.claude/skills/analyse-pea` relit les relevés de l'artifact, rafraîchit les consensus sur le
+  web, met à jour `data/research.js`, republie la page et y enregistre l'analyse rédigée.
+
+Le commentaire rédigé dans la page n'a pas accès à internet : il s'appuie sur les données du
+relevé et sur la base de recherche datée. Seule l'analyse demandée en conversation rafraîchit
+les consensus.
 
 ### Lecture du consensus
 

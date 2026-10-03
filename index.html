@@ -232,6 +232,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .meter i { display: block; height: 100%; background: var(--accent); }
 .plain { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink-2); font-size: .88rem; }
 .plain b { color: var(--ink); }
+.plain .chip { vertical-align: 1px; }
+.prose { display: grid; gap: 6px; max-width: 80ch; }
+.prose h3 { margin-top: 8px; }
+.prose p { color: var(--ink); }
+.prose .plain { color: var(--ink); font-size: .92rem; }
 
 /* Barres horizontales et divergentes (HTML, nettes à toute largeur) */
 .hb, .db { display: grid; gap: 2px; }
@@ -311,6 +316,7 @@ details.paste textarea { width: 100%; font: .82rem/1.4 ui-monospace, SFMono-Regu
 
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button class="tab" role="tab" id="tab-synthese" data-tab="synthese" aria-selected="true">Synthèse</button>
+    <button class="tab" role="tab" id="tab-analyse" data-tab="analyse" aria-selected="false">Analyse</button>
     <button class="tab" role="tab" id="tab-positions" data-tab="positions" aria-selected="false">Positions</button>
     <button class="tab" role="tab" id="tab-controles" data-tab="controles" aria-selected="false">Contrôles <span class="count" id="countCtrl" hidden></span></button>
     <button class="tab" role="tab" id="tab-alertes" data-tab="alertes" aria-selected="false">Alertes <span class="count" id="countAlert" hidden></span></button>
@@ -320,6 +326,7 @@ details.paste textarea { width: 100%; font: .82rem/1.4 ui-monospace, SFMono-Regu
 
   <main>
     <section class="panel" id="panel-synthese" role="tabpanel" aria-labelledby="tab-synthese"></section>
+    <section class="panel" id="panel-analyse" role="tabpanel" aria-labelledby="tab-analyse" hidden></section>
     <section class="panel" id="panel-positions" role="tabpanel" aria-labelledby="tab-positions" hidden></section>
     <section class="panel" id="panel-controles" role="tabpanel" aria-labelledby="tab-controles" hidden></section>
     <section class="panel" id="panel-alertes" role="tabpanel" aria-labelledby="tab-alertes" hidden></section>

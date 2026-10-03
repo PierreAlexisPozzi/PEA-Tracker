@@ -16,7 +16,7 @@
   const R = window.PEA_RESEARCH || { instruments: {}, excluded: [], asOf: null, source: '' };
   const PEA_CEILING = 150000;
   const LS_KEY = 'pea-tracker-v1';
-  const TABS = ['synthese', 'positions', 'controles', 'alertes', 'flux', 'idees'];
+  const TABS = ['synthese', 'analyse', 'positions', 'controles', 'alertes', 'flux', 'idees'];
   const DEFAULT_SETTINGS = {
     lineWarn: 15, lineAlert: 25,
     sectorWarn: 20, sectorAlert: 25,
@@ -27,7 +27,8 @@
     staleDays: 35,
     researchStaleDays: 60,
     deposits: null,
-    openDate: ''
+    openDate: '',
+    autoClaude: true
   };
   const COLS = {
     name: ['name', 'libelle', 'nom', 'valeur', 'instrument', 'titre', 'designation'],
@@ -61,7 +62,7 @@
     mode: 'pending',
     store: null,
     loaded: false,
-    snapshots: [], alerts: [], flows: [], research: {},
+    snapshots: [], alerts: [], flows: [], analyses: [], research: {},
     settings: Object.assign({}, DEFAULT_SETTINGS),
     current: null,
     demo: null,
@@ -72,7 +73,12 @@
     readOnly: false,
     awaitId: null,
     pending: null,
-    alertDraft: null
+    alertDraft: null,
+    analysisId: null,
+    analysisView: null,
+    claudeRun: null,
+    sample: null,
+    sampleOff: false
   };
 
   /* ================================================================ Utilitaires */
@@ -152,14 +158,14 @@
     init(cb) {
       this.onChange = cb;
       this.data = lsRead();
-      ['snapshots', 'alerts', 'flows', 'research'].forEach((k) => { this.data[k] = this.data[k] || {}; });
+      ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((k) => { this.data[k] = this.data[k] || {}; });
       this.data.settings = this.data.settings || {};
       this.emit();
     },
     emit() {
       const d = this.data;
       const list = (k) => Object.keys(d[k]).map((id) => Object.assign({ id }, d[k][id]));
-      this.onChange({ snapshots: list('snapshots'), alerts: list('alerts'), flows: list('flows'), research: d.research, settings: d.settings });
+      this.onChange({ snapshots: list('snapshots'), alerts: list('alerts'), flows: list('flows'), analyses: list('analyses'), research: d.research, settings: d.settings });
     },
     async set(coll, id, doc) {
       if (coll === 'settings') this.data.settings = clone(doc); else this.data[coll][id] = clone(doc);
@@ -173,7 +179,7 @@
     },
     exportAll() { return clone(this.data); },
     importAll(obj) {
-      ['snapshots', 'alerts', 'flows', 'research'].forEach((k) => { this.data[k] = obj[k] || {}; });
+      ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((k) => { this.data[k] = obj[k] || {}; });
       this.data.settings = obj.settings || {};
       lsWrite(this.data);
       this.emit();
@@ -181,14 +187,14 @@
   };
 
   function DbStore(db) {
-    const cache = { snapshots: {}, alerts: {}, flows: {}, research: {}, settings: null };
+    const cache = { snapshots: {}, alerts: {}, flows: {}, analyses: {}, research: {}, settings: null };
     const seen = new Set();
     let onChange = null;
     const emit = () => {
-      if (seen.size < 5) return;
+      if (seen.size < 6) return;
       onChange({
         snapshots: Object.values(cache.snapshots), alerts: Object.values(cache.alerts),
-        flows: Object.values(cache.flows), research: cache.research, settings: cache.settings || {}
+        flows: Object.values(cache.flows), analyses: Object.values(cache.analyses), research: cache.research, settings: cache.settings || {}
       });
     };
     const onErr = () => { seen.add('err'); toast('Connexion aux données interrompue. Rechargez la page.'); };
@@ -202,7 +208,7 @@
       kind: 'db',
       init(cb) {
         onChange = cb;
-        ['snapshots', 'alerts', 'flows', 'research'].forEach((coll) => {
+        ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((coll) => {
           db.collection(coll).onSnapshot((snap) => {
             const m = {};
             snap.docs.forEach((d) => { if (d.exists) m[d.id] = Object.assign({ id: d.id }, d.data()); });
@@ -248,6 +254,7 @@
     S.alerts = (d.alerts || []).sort((a, b) => String(a.createdAt) < String(b.createdAt) ? -1 : 1);
     S.flows = (d.flows || []).sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
     S.research = d.research || {};
+    S.analyses = d.analyses || [];
     S.settings = Object.assign({}, DEFAULT_SETTINGS, d.settings || {});
     if (S.awaitId && S.snapshots.some((s) => s.id === S.awaitId)) { S.current = S.awaitId; S.awaitId = null; }
     if (!S.current || !S.snapshots.some((s) => s.id === S.current)) {
@@ -851,6 +858,7 @@
     renderHeader(A);
     renderCounts(C, AL);
     $('#panel-synthese').innerHTML = renderSynthese(A, C);
+    $('#panel-analyse').innerHTML = renderAnalyse(A);
     $('#panel-positions').innerHTML = renderPositions(A);
     $('#panel-controles').innerHTML = renderControles(A, C);
     $('#panel-alertes').innerHTML = renderAlertes(A, AL);
@@ -975,7 +983,7 @@
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
       '</tbody></table></div><p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
 
-    return demoBanner() + updateCard() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
+    return demoBanner() + updateCard() + analysisTeaser() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
   }
 
   /* ---------------- Positions */
@@ -1102,7 +1110,7 @@
       ['Mouvements', 'Achats, renforcements, allègements, ventes déduits.', snap ? chip(prev ? 'ok' : 'info', prev ? mv + ' mouvement' + (mv > 1 ? 's' : '') : 'Premier relevé') : ''],
       ['Contrôles du portefeuille', 'Concentration, pertes, analystes, cadre PEA.', snap ? chip(nA ? 'alert' : nW ? 'warn' : 'ok', nA + ' alerte' + (nA > 1 ? 's' : '') + ', ' + nW + ' vigilance' + (nW > 1 ? 's' : '')) : ''],
       ['Alertes', 'Vos seuils évalués sur le relevé.', snap ? chip(hits ? 'alert' : 'ok', hits + ' déclenchée(s)') : ''],
-      ['Décision', 'Avis par ligne et idées mid caps.', snap ? chip('info', 'Voir Synthèse') : '']
+      ['Analyse', 'Rapport automatique, commentaire de Claude, décisions.', snap ? (S.demo ? chip('info', 'Exemple') : chip(analysesFor(snap).length ? 'ok' : 'info', analysesFor(snap).length ? analysesFor(snap).length + ' analyse(s)' : 'À lancer')) : '']
     ];
     return '<div class="section"><div class="section-head"><h2>Chaîne de traitement d’un relevé</h2></div><ol class="pipeline" style="list-style:none;padding:0;margin:0">' +
       steps.map((s, i) => '<li class="step"><span class="n">Étape ' + (i + 1) + '</span><span class="t">' + esc(s[0]) + '</span><span class="d">' + esc(s[1]) + '</span>' + s[2] + '</li>').join('') + '</ol></div>';
@@ -1142,9 +1150,7 @@
   /* ---------------- Idées */
 
   function renderIdees(A) {
-    const held = new Set(A ? A.lines.map((l) => l.isin) : []);
-    let ideas = allIsins().map((i) => Object.assign({ isin: i }, inst(i))).filter((m) => m.idea && m.consensus && !held.has(m.isin))
-      .map((m) => Object.assign(m, { sc: ideaScore(m) }));
+    const ideas = rankedIdeas(A);
     const key = S.ideaSort;
     ideas.sort((a, b) => key === 'up' ? b.sc.up - a.sc.up : key === 'per' ? (a.per ? a.per[0] : 99) - (b.per ? b.per[0] : 99) : b.sc.score - a.sc.score);
     const size = A ? A.total * 0.08 : null;
@@ -1170,6 +1176,316 @@
       '<div class="grid-2"><div class="card section"><h3>Écartées après analyse</h3><ul class="plain">' + (R.excluded || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div>' +
       '<div class="card section"><h3>Alternative sans choix de titres</h3><p class="small">Un ETF petites et moyennes capitalisations européennes éligible PEA donne la même exposition en une seule ligne, sans risque spécifique. L’offre est réduite et le plus souvent à réplication synthétique : vérifiez l’ISIN, les frais et le DIC sur BoursoBank avant d’acheter.</p></div></div>' +
       '<p class="note">Ces idées ne constituent pas un conseil personnalisé. Un objectif d’analyste est une estimation à 12 mois, souvent révisée : le potentiel affiché n’est pas une promesse de rendement.</p></div>';
+  }
+
+  /* ================================================================ Analyse */
+
+  const TRIGGER_LABEL = { import: 'après import', demande: 'à la demande', claude: 'par Claude, avec recherche web', apercu: 'aperçu' };
+  const STATUS_LABEL = { ok: 'Conforme', warn: 'Vigilance', alert: 'Alerte', info: 'Info' };
+  const CLAUDE_ERR = {
+    not_granted: 'Vous n’avez pas autorisé cette page à utiliser Claude.',
+    sampling_disabled: 'Claude n’est pas disponible pour ce compte.',
+    not_declared: 'Cette version de la page ne peut pas appeler Claude.',
+    rate_limited: 'Limite d’utilisation atteinte : réessayez plus tard.',
+    session_expired: 'Session expirée : reconnectez-vous à claude.ai.',
+    refused: 'Claude n’a pas répondu à cette demande.',
+    empty_completion: 'Réponse vide : réessayez.',
+    prompt_too_large: 'Données trop volumineuses pour une seule demande.',
+    cancelled: 'Rédaction arrêtée.',
+    upstream_error: 'Service momentanément interrompu : réessayez.'
+  };
+  const dateTimeFR = (iso) => { try { return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return dateFR(iso); } };
+
+  let samplePromise = null;
+  function getSample() {
+    if (!samplePromise) {
+      samplePromise = window.claude && typeof window.claude.use === 'function'
+        ? window.claude.use('sample').catch(() => null)
+        : Promise.resolve(null);
+    }
+    return samplePromise;
+  }
+
+  function prevOf(snap) {
+    if (!snap || S.demo) return null;
+    return S.snapshots.filter((s) => s.date < snap.date).slice(-1)[0] || null;
+  }
+
+  /** Idées mid caps non détenues, notées et triées par score. */
+  function rankedIdeas(A) {
+    const held = new Set(A ? A.lines.map((l) => l.isin) : []);
+    return allIsins().map((i) => Object.assign({ isin: i }, inst(i))).filter((m) => m.idea && m.consensus && !held.has(m.isin))
+      .map((m) => Object.assign(m, { sc: ideaScore(m) })).sort((a, b) => b.sc.score - a.sc.score);
+  }
+
+  /** Analyse chiffrée d'un relevé, comparée au relevé précédent. Document autonome (historisé). */
+  function buildAnalysis(snap, prev, trigger) {
+    const st = S.settings;
+    const A = analyze(snap);
+    const C = runControls(A);
+    const P = prev ? analyze(prev) : null;
+    const PC = P ? runControls(P) : null;
+    const health = healthScore(C);
+    const nA = C.filter((c) => c.status === 'alert').length;
+    const nW = C.filter((c) => c.status === 'warn').length;
+    const prevMap = prev ? new Map(prev.positions.map((p) => [p.isin, p])) : null;
+    const changes = [];
+    let delta = null;
+    if (P) {
+      const days = Math.round((new Date(snap.date) - new Date(prev.date)) / 86400000);
+      const contrib = A.lines.filter((l) => prevMap.has(l.isin)).map((l) => {
+        const p = prevMap.get(l.isin);
+        return { label: l.label, eur: (p.qty || 0) * ((l.last || 0) - (p.last || 0)), pct: p.last ? (l.last / p.last - 1) * 100 : null };
+      });
+      const market = sum(contrib, (c) => c.eur);
+      const moves = diffSnapshots(prev, snap);
+      const net = sum(moves.filter((f) => f.type === 'achat' || f.type === 'renfort'), (f) => f.amount) - sum(moves.filter((f) => f.type === 'vente' || f.type === 'allegement'), (f) => f.amount);
+      const cashDelta = (A.cash || 0) - (P.cash || 0);
+      const prevHealth = healthScore(PC);
+      delta = { days, prevDate: prev.date, total: A.total - P.total, pnl: A.pnl - P.pnl, market, net, health: health - prevHealth };
+      changes.push('Valeur : ' + eur(P.total, 0) + ' → ' + eur(A.total, 0) + ' (' + sEur(A.total - P.total, 0) + ') en ' + days + ' jour' + (days > 1 ? 's' : '') + '.');
+      changes.push('Effet des cours : ' + sEur(market, 0) + ' ; achats et ventes nets : ' + sEur(net, 0) + (Math.abs(cashDelta) >= 1 ? ' ; liquidités : ' + sEur(cashDelta, 0) : '') + '.');
+      const movers = contrib.filter((c) => Math.abs(c.eur) >= 0.5).sort((a, b) => b.eur - a.eur);
+      if (movers.length) {
+        const up = movers[0];
+        const down = movers[movers.length - 1];
+        changes.push((up.eur > 0 ? 'Plus forte contribution : ' + up.label + ' (' + sEur(up.eur, 0) + ', ' + sPct(up.pct) + ')' : 'Aucune ligne en hausse') +
+          (down.eur < 0 ? ' · plus forte baisse : ' + down.label + ' (' + sEur(down.eur, 0) + ', ' + sPct(down.pct) + ')' : '') + '.');
+      }
+      moves.forEach((f) => changes.push(FLOW_TYPES[f.type] + ' : ' + ((inst(f.isin) || {}).short || (inst(f.isin) || {}).name || f.name) + (f.qty ? ' · ' + nb(f.qty, f.qty % 1 ? 2 : 0) + ' titre(s)' : '') + (f.amount ? ' · ~' + eur(f.amount, 0) : '') + '.'));
+      const rank = { ok: 0, info: 0, warn: 1, alert: 2 };
+      C.forEach((c) => {
+        const o = PC.find((x) => x.id === c.id);
+        if (o && rank[o.status] !== rank[c.status]) changes.push(c.title + ' : ' + STATUS_LABEL[o.status] + ' → ' + STATUS_LABEL[c.status] + (rank[c.status] > rank[o.status] ? ' (dégradé).' : ' (amélioré).'));
+      });
+      changes.push('Indice de santé : ' + prevHealth + ' → ' + health + '/100.');
+    } else {
+      changes.push('Premier relevé analysé : les évolutions apparaîtront à partir du prochain import.');
+    }
+    const hits = S.demo ? [] : S.alerts.filter((a) => a.active !== false).map((a) => ({ a, r: evalAlert(a, A) })).filter((x) => x.r.hit);
+    hits.forEach((x) => changes.push('Alerte déclenchée : ' + alertTitle(x.a) + (x.r.matches.length ? ' (' + x.r.matches.join(', ') + ')' : '') + '.'));
+
+    const actions = C.filter((c) => (c.status === 'alert' || c.status === 'warn') && c.action)
+      .sort((a, b) => (a.status === 'alert' ? 0 : 1) - (b.status === 'alert' ? 0 : 1))
+      .slice(0, 6).map((c) => ({ level: c.status, title: c.title, text: c.action }));
+    hits.forEach((x) => { if (x.a.note) actions.push({ level: 'warn', title: 'Alerte ' + alertTitle(x.a), text: x.a.note }); });
+
+    const core = sum(A.lines.filter((l) => l.m.sector === 'Monde diversifié'), (l) => l.weight);
+    const topSector = A.sectors.find((x) => !/diversifié/i.test(x.name));
+    const lines = A.lines.slice().sort((a, b) => b.value - a.value).map((l) => {
+      const notes = [];
+      const p = prevMap && prevMap.get(l.isin);
+      if (p && p.last && l.last) { const ch = (l.last / p.last - 1) * 100; if (Math.abs(ch) >= 0.5) notes.push('Cours ' + sPct(ch) + ' depuis le ' + dateFR(prev.date) + '.'); }
+      if (prevMap && !p) notes.push('Nouvelle ligne.');
+      if (l.m.nonTradable) notes.push('Titre radié : demander son retrait du PEA.');
+      else {
+        if (!l.m.diversified && l.weight >= st.lineAlert) notes.push('Poids trop élevé (' + pct(l.weight) + ') : ne plus renforcer.');
+        if (ok(l.upside) && l.upside <= 0) notes.push('Objectif des analystes atteint : envisager d’alléger.');
+        if (l.pnlPct <= st.lossAlert) notes.push('Forte moins-value : relire la thèse' + (l.call ? ' (analystes : ' + l.call.label.toLowerCase() + ')' : '') + '.');
+        if (topSector && topSector.weight >= st.sectorWarn && l.m.sector === topSector.name) notes.push('Secteur ' + topSector.name + ' surpondéré : ne pas renforcer.');
+        if (l.weight < st.dustMax) notes.push('Ligne négligeable : la porter à ~5 % ou la céder.');
+        if (l.m.sector === 'Monde diversifié' && core < st.coreTarget) notes.push('Socle sous la cible : support prioritaire des prochains versements.');
+        if (l.call && l.call.cls === 'buy' && !l.call.thin && ok(l.upside) && l.upside >= 30 && l.weight < 8) notes.push('Consensus positif et potentiel élevé : renforcement possible.');
+      }
+      if (!notes.length) notes.push('Rien à signaler.');
+      return { isin: l.isin, label: l.label, weight: l.weight, pnlPct: l.pnlPct, analysts: l.call ? l.call.label : null, analystsN: l.call ? l.call.n : null, upside: ok(l.upside) ? l.upside : null, view: l.m.view ? l.m.view.label : null, note: notes.join(' ') };
+    });
+
+    let nextMoney;
+    if (core < st.coreTarget) {
+      const gap = Math.max(0, (st.coreTarget / 100 * A.total - core / 100 * A.total) / (1 - st.coreTarget / 100));
+      nextMoney = 'Prochains versements vers l’ETF Monde : environ ' + eur(gap, 0) + ' pour porter le socle de ' + pct(core) + ' à la cible de ' + st.coreTarget + ' %.';
+    } else {
+      const idea = rankedIdeas(A).find((m) => A.total && m.consensus.price / A.total * 100 <= 12);
+      nextMoney = 'Socle atteint. Un versement peut aller à une nouvelle ligne mid cap' + (idea ? ' (par exemple ' + idea.name + ', score ' + idea.sc.score + '/100)' : '') + ', dans la limite de ~8 % du PEA.';
+    }
+    if (topSector && topSector.weight >= st.sectorAlert) nextMoney += ' Éviter le secteur ' + topSector.name + ' (' + pct(topSector.weight) + ').';
+
+    let headline = delta
+      ? 'Valeur ' + sEur(delta.total, 0) + ' depuis le ' + dateFR(delta.prevDate) + ' (effet des cours ' + sEur(delta.market, 0) + '). Santé ' + (health - delta.health) + ' → ' + health + '/100.'
+      : 'Santé ' + health + '/100 : ' + nA + ' alerte' + (nA > 1 ? 's' : '') + ', ' + nW + ' vigilance' + (nW > 1 ? 's' : '') + '.';
+    if (actions[0]) headline += ' Priorité : ' + actions[0].title.charAt(0).toLowerCase() + actions[0].title.slice(1) + '.';
+
+    return {
+      date: snap.date, snapshotId: snap.id, prevSnapshotId: prev ? prev.id : null,
+      createdAt: new Date().toISOString(), trigger, author: 'page', researchAsOf: researchAsOf(),
+      headline,
+      kpi: { total: A.total, pnl: A.pnl, pnlPct: A.pnlPct, pnlT: A.pnlT, pnlTPct: A.pnlTPct, health, alerts: nA, warns: nW, lines: A.lines.length },
+      delta, changes, actions, lines, nextMoney, claude: null
+    };
+  }
+
+  /** Consigne et données envoyées à Claude pour rédiger le commentaire. */
+  function claudePrompt(doc, snap) {
+    const st = S.settings;
+    const A = analyze(snap);
+    const C = runControls(A);
+    const age = daysSince(doc.researchAsOf);
+    const pos = A.lines.slice().sort((a, b) => b.value - a.value).map((l) => '- ' + l.label + ' | ' + (l.m.kind === 'etf' ? 'ETF' : 'action') + ' | ' + (l.m.sector || 'non classé') +
+      ' | poids ' + pct(l.weight) + ' | +/- ' + sPct(l.pnlPct) + (l.m.nonTradable ? ' | TITRE RADIÉ (société liquidée)' : '') +
+      (l.call ? ' | consensus ' + l.call.label + ' (' + l.call.n + ' analystes, note ' + nb(l.call.med, 2) + '/5, objectif ' + eur(l.m.consensus.target) + ', potentiel ' + sPct(l.upside) + ')' : '') +
+      (l.m.view ? ' | avis de synthèse ' + l.m.view.label : '')).join('\n');
+    const ctrl = C.filter((c) => c.status === 'alert' || c.status === 'warn').map((c) => '- [' + (c.status === 'alert' ? 'ALERTE' : 'VIGILANCE') + '] ' + c.title + ' : ' + c.detail).join('\n');
+    const ideas = rankedIdeas(A).slice(0, 4).map((m) => '- ' + m.name + ' (' + m.sector + ') : score ' + m.sc.score + '/100, potentiel ' + sPct(m.sc.up, 0) + ', PER 2026e ' + (m.per ? nb(m.per[0], 1) : 'n.d.') + ', 1 titre = ' + eur(m.consensus.price)).join('\n');
+    return [
+      'Tu assistes un investisseur particulier français qui suit son PEA chez BoursoBank. Rédige en français une nouvelle analyse de son portefeuille à partir des seules données ci-dessous.',
+      'Règles : tu n’as pas accès à internet ; n’invente aucun cours, objectif ni actualité et appuie-toi sur les chiffres fournis. Les consensus datent du ' + dateFR(doc.researchAsOf) + (age != null && age > 30 ? ', signale qu’ils sont à rafraîchir' : '') + '. Donne des pistes d’aide à la décision, pas un conseil en investissement personnalisé. Sois direct et concret.',
+      'Format : Markdown simple, 350 mots maximum, exactement ces sections :\n## Synthèse\n(2 ou 3 phrases)\n## Ce qui a changé\n(puces)\n## Ligne par ligne\n(une puce par ligne détenue : **Nom** : Renforcer, Conserver, Alléger, Vendre ou Sortir, puis la raison en une phrase)\n## Plan d’action\n(3 à 5 puces, par priorité)\n## Points de vigilance\n(puces)',
+      '',
+      'Relevé du ' + dateFR(snap.date) + (doc.delta ? ' (précédent : ' + dateFR(doc.delta.prevDate) + ')' : ' (premier relevé)') + '.',
+      'Valeur ' + eur(A.total, 0) + ' · +/- value latente ' + sEur(A.pnl, 0) + ' (' + sPct(A.pnlPct) + ')' + (A.hasNonTradable ? ' · hors titres radiés ' + sEur(A.pnlT, 0) + ' (' + sPct(A.pnlTPct) + ')' : '') + ' · liquidités ' + eur(A.cash, 0) + ' · indice de santé ' + doc.kpi.health + '/100.',
+      '',
+      'Évolutions détectées :\n' + doc.changes.map((c) => '- ' + c).join('\n'),
+      '',
+      'Positions :\n' + pos,
+      '',
+      'Contrôles en alerte ou en vigilance :\n' + (ctrl || '- aucun'),
+      '',
+      'Seuils de l’investisseur : ligne ' + st.lineWarn + ' / ' + st.lineAlert + ' %, secteur ' + st.sectorWarn + ' / ' + st.sectorAlert + ' %, socle ETF Monde visé ' + st.coreTarget + ' %.',
+      'Règle pour le prochain versement : ' + doc.nextMoney,
+      '',
+      'Idées mid caps non détenues, consensus à l’achat :\n' + (ideas || '- aucune')
+    ].join('\n');
+  }
+
+  /** Markdown minimal (titres, puces, gras) rendu après échappement. */
+  function mdLite(text) {
+    const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    let html = '';
+    let list = false;
+    const close = () => { if (list) { html += '</ul>'; list = false; } };
+    esc(text).split('\n').forEach((raw) => {
+      const l = raw.trim();
+      if (!l) { close(); return; }
+      if (/^#{1,4}\s/.test(l)) { close(); html += '<h3>' + inline(l.replace(/^#+\s*/, '')) + '</h3>'; }
+      else if (/^([-*•]|\d+[.)])\s/.test(l)) { if (!list) { html += '<ul class="plain">'; list = true; } html += '<li>' + inline(l.replace(/^([-*•]|\d+[.)])\s+/, '')) + '</li>'; }
+      else { close(); html += '<p>' + inline(l) + '</p>'; }
+    });
+    close();
+    return html;
+  }
+
+  async function createAnalysis(snap, trigger, withClaude) {
+    if (!snap || S.demo) return null;
+    const doc = buildAnalysis(snap, prevOf(snap), trigger);
+    const id = snap.id + '_' + doc.createdAt.slice(11, 19).replace(/:/g, '-');
+    doc.id = id;
+    try { await save('analyses', id, doc); } catch (e) { return null; }
+    if (!S.analyses.some((a) => a.id === id)) S.analyses = S.analyses.concat([doc]);
+    S.analysisId = id;
+    renderAll();
+    if (withClaude) runClaude(id, doc);
+    return id;
+  }
+
+  async function runClaude(id, given) {
+    const sample = await getSample();
+    if (!sample) { toast('Le commentaire de Claude est disponible dans l’artifact claude.ai.'); return; }
+    const base = given || S.analyses.find((a) => a.id === id);
+    const snap = base && S.snapshots.find((s) => s.id === base.snapshotId);
+    if (!base || !snap) { toast('Le relevé de cette analyse n’existe plus.'); return; }
+    if (S.claudeRun) S.claudeRun.ctl.abort();
+    const run = { id, text: '', ctl: new AbortController() };
+    S.claudeRun = run;
+    paintClaude();
+    let claude;
+    try {
+      const res = await sample(claudePrompt(base, snap), {
+        signal: run.ctl.signal, cache: false,
+        onText: ({ text }) => { if (S.claudeRun === run) { run.text = text; paintClaude(); } }
+      });
+      claude = { status: 'ok', text: res.text, truncated: !!res.truncated, tier: res.modelTierApplied || null, at: new Date().toISOString(), source: 'page' };
+    } catch (e) {
+      const code = (e && e.code) || 'upstream_error';
+      if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) S.sampleOff = true;
+      claude = { status: code === 'cancelled' ? 'stopped' : 'error', code, text: (e && e.text) || '', at: new Date().toISOString(), source: 'page' };
+    }
+    if (S.claudeRun === run) S.claudeRun = null;
+    const latest = S.analyses.find((a) => a.id === id) || base;
+    try { await save('analyses', id, Object.assign({}, latest, { id, claude })); } catch (err) { /* déjà signalé */ }
+    renderAll();
+  }
+
+  /** Pendant la rédaction, seul le texte change : l'en-tête (bouton Arrêter) reste stable. */
+  function paintClaude() {
+    const box = $('#claudeBox');
+    if (!box || !S.analysisView) return;
+    const run = S.claudeRun && S.claudeRun.id === S.analysisView.id ? S.claudeRun : null;
+    const body = $('#claudeBody');
+    if (run && run.text && body && box.querySelector('[data-act="claude-stop"]')) { body.innerHTML = mdLite(run.text); return; }
+    box.innerHTML = claudeInner(S.analysisView);
+  }
+
+  function claudeInner(view) {
+    const run = S.claudeRun && S.claudeRun.id === view.id ? S.claudeRun : null;
+    const c = view.claude;
+    const canRun = !run && !view.live && S.sample && !S.sampleOff && !S.readOnly && view.author !== 'claude-session';
+    let head = '<div class="section-head"><h2>Commentaire de Claude</h2><div class="actions">';
+    if (run) head += '<button class="btn sm" type="button" data-act="claude-stop">Arrêter</button>';
+    if (canRun) head += '<button class="btn sm" type="button" data-act="claude-redo" data-id="' + esc(view.id) + '">' + (c && c.text ? 'Régénérer' : 'Demander à Claude') + '</button>';
+    head += '</div></div>';
+    let body;
+    if (run) body = run.text ? mdLite(run.text) : '<p class="muted">Claude rédige son analyse du relevé… Comptez de quelques secondes à une minute. La première fois, une autorisation vous est demandée.</p>';
+    else if (c && c.status === 'error') body = '<p class="muted">' + esc(CLAUDE_ERR[c.code] || 'Commentaire indisponible.') + '</p>' + (c.text ? mdLite(c.text) : '');
+    else if (c && c.text) body = mdLite(c.text) + (c.status === 'stopped' ? '<p class="small muted">Rédaction arrêtée avant la fin.</p>' : '') + (c.truncated ? '<p class="small muted">Réponse coupée par la limite de longueur.</p>' : '');
+    else if (c && c.status === 'stopped') body = '<p class="muted">Rédaction arrêtée.</p>';
+    else if (view.live) body = '<p class="muted">Cliquez sur « Nouvelle analyse » pour enregistrer cette analyse et obtenir le commentaire de Claude.</p>';
+    else if (S.sample && !S.sampleOff) body = '<p class="muted">Pas encore de commentaire pour cette analyse.</p>';
+    else body = '<p class="muted">Le commentaire rédigé par Claude s’obtient dans l’artifact claude.ai. L’analyse chiffrée ci-dessus est complète sans lui.</p>';
+    const meta = c && c.at && c.status !== 'error' && !run ? '<p class="small muted">Rédigé le ' + esc(dateTimeFR(c.at)) + (c.source === 'session' ? ' dans une conversation avec Claude, consensus vérifiés sur le web' : ' à partir des données de la page, sans accès à internet') + '.</p>' : '';
+    return head + meta + '<div class="prose" id="claudeBody">' + body + '</div>';
+  }
+
+  function analysesFor(snap) {
+    if (!snap || S.demo) return [];
+    return S.analyses.filter((a) => a.snapshotId === snap.id).sort((a, b) => String(a.createdAt) < String(b.createdAt) ? 1 : -1);
+  }
+
+  function analysisTeaser() {
+    const snap = currentSnapshot();
+    if (!snap || S.demo) return '';
+    const d = analysesFor(snap)[0];
+    return '<div class="banner"><span><b>' + (d ? 'Dernière analyse, ' + esc(dateTimeFR(d.createdAt)) : 'Analyse du relevé') + ' :</b> ' + esc(d ? d.headline || '' : 'pas encore enregistrée.') + '</span>' +
+      '<button class="btn sm" type="button" data-goto="analyse">' + (d ? 'Lire l’analyse' : 'Ouvrir') + '</button></div>';
+  }
+
+  function renderAnalyse(A) {
+    if (!A) { S.analysisView = null; return emptyState(); }
+    const snap = currentSnapshot();
+    const list = analysesFor(snap);
+    const doc = list.find((a) => a.id === S.analysisId) || list[0] || null;
+    let view;
+    if (doc && doc.lines) view = Object.assign({}, doc);
+    else {
+      view = buildAnalysis(snap, prevOf(snap), 'apercu');
+      if (doc) Object.assign(view, { id: doc.id, createdAt: doc.createdAt, trigger: doc.trigger, author: doc.author, claude: doc.claude }, doc.headline ? { headline: doc.headline } : {});
+      else view.live = true;
+    }
+    S.analysisView = view;
+    const k = view.kpi;
+    const d = view.delta;
+    const dTxt = (v, f) => d ? '<span class="sub num ' + tone(v) + '">' + f(v) + ' depuis le ' + dateFR(d.prevDate) + '</span>' : '<span class="sub">premier relevé</span>';
+    const sel = list.length > 1 ? '<label class="sr" for="anaSelect">Analyse affichée</label><select class="input" id="anaSelect">' + list.map((a) => '<option value="' + esc(a.id) + '"' + (doc && a.id === doc.id ? ' selected' : '') + '>' + esc(dateTimeFR(a.createdAt)) + ' · ' + esc(TRIGGER_LABEL[a.trigger] || '') + '</option>').join('') + '</select>' : '';
+    const meta = view.live ? (S.demo ? 'Analyse de l’exemple fictif.' : 'Analyse instantanée, pas encore enregistrée.') : 'Générée le ' + dateTimeFR(view.createdAt) + ' · ' + (TRIGGER_LABEL[view.trigger] || '') + ' · consensus au ' + dateFR(view.researchAsOf);
+    const lvl = (l) => chip(l === 'alert' ? 'alert' : l === 'warn' ? 'warn' : 'info', STATUS_LABEL[l] || 'Info');
+    return demoBanner() +
+      '<div class="section-head"><div><h2>Analyse du relevé du ' + dateFR(snap.date) + '</h2><p class="small muted">' + esc(meta) + '</p></div>' +
+      '<div class="actions">' + sel + '<button class="btn primary" type="button" data-act="new-analysis"' + (S.demo || S.readOnly ? ' disabled' : '') + '>Nouvelle analyse</button></div></div>' +
+      '<div class="banner"><span>' + esc(view.headline) + '</span></div>' +
+      '<div class="kpis"><div class="kpi"><span class="label">Valeur du PEA</span><span class="value num">' + eur(k.total, 0) + '</span>' + dTxt(d && d.total, (v) => sEur(v, 0)) + '</div>' +
+      '<div class="kpi"><span class="label">+/- value latente</span><span class="value num ' + tone(k.pnl) + '">' + sEur(k.pnl, 0) + '</span><span class="sub num">' + sPct(k.pnlPct) + (ok(k.pnlT) && Math.abs(k.pnlT - k.pnl) > 1 ? ' · hors radiés ' + sEur(k.pnlT, 0) : '') + '</span></div>' +
+      '<div class="kpi"><span class="label">Effet des cours</span><span class="value num ' + tone(d && d.market) + '">' + (d ? sEur(d.market, 0) : '—') + '</span><span class="sub">' + (d ? 'achats et ventes nets ' + sEur(d.net, 0) : 'premier relevé') + '</span></div>' +
+      '<div class="kpi"><span class="label">Indice de santé</span><span class="value num">' + k.health + '/100</span>' + (d ? '<span class="sub num ' + tone(d.health) + '">' + (d.health > 0 ? '+' : d.health < 0 ? '−' : '') + Math.abs(d.health) + ' point' + (Math.abs(d.health) > 1 ? 's' : '') + '</span>' : '<span class="sub">' + k.alerts + ' alerte(s), ' + k.warns + ' vigilance(s)</span>') + '</div></div>' +
+      '<div class="grid-2"><div class="card section"><h2>Ce qui a changé</h2><ul class="plain">' + view.changes.map((c) => '<li>' + esc(c) + '</li>').join('') + '</ul></div>' +
+      '<div class="card section"><h2>Plan d’action</h2>' + (view.actions.length ? '<ol class="plain">' + view.actions.map((a) => '<li>' + lvl(a.level) + ' <b>' + esc(a.title) + '</b> : ' + esc(a.text) + '</li>').join('') + '</ol>' : '<p class="muted">Rien d’urgent : vos seuils sont respectés.</p>') +
+      '<p class="small"><b>Prochain versement :</b> ' + esc(view.nextMoney) + '</p></div></div>' +
+      '<div class="card section" id="claudeBox" aria-live="polite">' + claudeInner(view) + '</div>' +
+      '<div class="section"><h2>Ligne par ligne</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th class="r">Poids</th><th class="r">+/- %</th><th>Analystes</th><th class="r">Potentiel</th><th>Avis</th><th>Commentaire</th></tr></thead><tbody>' +
+      view.lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><b>' + esc(l.label) + '</b></td><td class="r">' + pct(l.weight) + '</td><td class="r ' + tone(l.pnlPct) + '">' + sPct(l.pnlPct) + '</td>' +
+        '<td>' + (l.analysts ? recoPill(l.analysts) + ' <span class="small muted">' + l.analystsN + '</span>' : '<span class="small muted">—</span>') + '</td><td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
+        '<td>' + (l.view ? recoPill(l.view) : '<span class="reco r-none">À étudier</span>') + '</td><td class="small">' + esc(l.note) + '</td></tr>').join('') +
+      '</tbody></table></div></div>' +
+      '<p class="note">Une analyse est créée automatiquement à chaque import (et Claude rédige un commentaire si l’option est active dans Réglages). « Nouvelle analyse » en refait une à tout moment. Pour une analyse avec consensus rafraîchis sur le web, demandez-la à Claude dans une conversation.</p>';
   }
 
   /* ================================================================ Feuilles */
@@ -1284,8 +1600,12 @@
     S.demo = null;
     S.current = snap.id;
     closeSheet();
-    toast('Relevé du ' + dateFR(date) + ' enregistré' + (flows.length ? ' · ' + flows.length + ' mouvement(s) détecté(s)' : '') + '.');
+    toast('Relevé du ' + dateFR(date) + ' enregistré' + (flows.length ? ' · ' + flows.length + ' mouvement(s) détecté(s)' : '') + ' · analyse en cours.');
+    S.analysisId = null;
+    showTab('analyse');
     renderAll();
+    const sample = await getSample();
+    await createAnalysis(snap, 'import', !!sample && S.settings.autoClaude !== false && !S.sampleOff);
   }
 
   function settingsSheet() {
@@ -1300,6 +1620,7 @@
       f('lossWarn', 'Moins-value : vigilance', st.lossWarn) + f('lossAlert', 'Moins-value : alerte', st.lossAlert) +
       f('coreTarget', 'Socle ETF Monde : cible', st.coreTarget) + f('coreMin', 'Socle : minimum', st.coreMin) +
       f('outsideEuropeMin', 'Hors Europe : minimum', st.outsideEuropeMin) + f('dustMax', 'Ligne négligeable sous', st.dustMax) + '</div>' +
+      '<h3>Analyse</h3><label class="check"><input type="checkbox" id="st-autoClaude"' + (st.autoClaude !== false ? ' checked' : '') + '> À chaque import, faire rédiger un commentaire par Claude (utilise votre compte Claude)</label>' +
       '<div class="actions"><button class="btn primary" type="submit"' + (S.readOnly ? ' disabled' : '') + '>Enregistrer</button><button class="btn" type="button" data-act="reset-settings">Seuils par défaut</button></div></form>' +
       (S.mode === 'local' ? '<div class="section"><h3>Sauvegarde</h3><p class="small muted">Vos données sont dans ce navigateur. Copiez la sauvegarde pour la conserver ou la transférer, et collez-la ici pour la restaurer.</p><textarea class="input" id="backup" rows="4" style="width:100%" placeholder="Collez une sauvegarde JSON pour la restaurer"></textarea><div class="actions"><button class="btn" type="button" data-act="copy-backup">Copier la sauvegarde</button><button class="btn" type="button" data-act="restore-backup">Restaurer</button></div></div>' : '<p class="small muted">Vos données sont enregistrées de façon privée avec cette page : vous les retrouvez sur tous vos appareils, et Claude peut les relire quand vous lui demandez une mise à jour.</p>'));
   }
@@ -1314,6 +1635,7 @@
     const dep = num($('#st-deposits').value);
     out.deposits = ok(dep) ? dep : null;
     out.openDate = $('#st-openDate').value || '';
+    out.autoClaude = $('#st-autoClaude').checked;
     if (out.lossWarn > 0) out.lossWarn = -out.lossWarn;
     if (out.lossAlert > 0) out.lossAlert = -out.lossAlert;
     try { await save('settings', 'main', out); } catch (err) { return; }
@@ -1372,7 +1694,13 @@
       if (t.dataset.isort) { S.ideaSort = t.dataset.isort; return renderAll(); }
       if (t.dataset.snapShow) { S.current = t.dataset.snapShow; showTab('synthese'); return renderAll(); }
       if (t.dataset.snapDel) {
-        if (t.dataset.armed) { await remove('snapshots', t.dataset.snapDel); toast('Relevé supprimé.'); return; }
+        if (t.dataset.armed) {
+          const sid = t.dataset.snapDel;
+          await remove('snapshots', sid);
+          for (const a of S.analyses.filter((x) => x.snapshotId === sid)) await remove('analyses', a.id);
+          toast('Relevé supprimé.');
+          return;
+        }
         t.dataset.armed = '1'; t.textContent = 'Confirmer'; setTimeout(() => { if (t.isConnected) { delete t.dataset.armed; t.textContent = 'Supprimer'; } }, 4000); return;
       }
       if (t.dataset.flowDel) {
@@ -1391,6 +1719,12 @@
       switch (t.dataset.act || t.id) {
         case 'btnImport': case 'import': S.pending = null; return importSheet();
         case 'btnSettings': case 'settings': return settingsSheet();
+        case 'new-analysis': {
+          const sample = await getSample();
+          return createAnalysis(currentSnapshot(), 'demande', !!sample && !S.sampleOff);
+        }
+        case 'claude-redo': return runClaude(t.dataset.id);
+        case 'claude-stop': if (S.claudeRun) S.claudeRun.ctl.abort(); return;
         case 'pick': if (S.readOnly) { toast('Lecture seule : import impossible depuis cette vue.'); return; } return $('#fileInput').click();
         case 'paste': S.pending = null; return importSheet({ paste: true });
         case 'parse-paste': return handlePaste();
@@ -1435,7 +1769,8 @@
     document.addEventListener('change', (e) => {
       const id = e.target.id;
       if (id === 'fileInput') { const f = e.target.files[0]; e.target.value = ''; if (f) handleFile(f); return; }
-      if (id === 'snapSelect') { S.current = e.target.value; return renderAll(); }
+      if (id === 'snapSelect') { S.current = e.target.value; S.analysisId = null; return renderAll(); }
+      if (id === 'anaSelect') { S.analysisId = e.target.value; return renderAll(); }
       if (id === 'al-scope' || id === 'al-target' || id === 'al-metric') {
         const d = readAlertForm();
         if (id === 'al-scope') d.target = null;
@@ -1530,10 +1865,11 @@
     S.store = db ? DbStore(db) : LocalStore;
     S.mode = db ? 'db' : 'local';
     S.store.init(applyData);
+    getSample().then((fn) => { S.sample = fn; if (fn) renderAll(); });
   }
 
   // Exposé pour les tests automatisés (aucun effet sur l'interface).
-  window.PEA_TRACKER = { isinValid, normalizeRows, qualityChecks, diffSnapshots, analyze, runControls, evalAlert, ideaScore, num, parseCsvText, matrixToRows, dateFromName };
+  window.PEA_TRACKER = { buildAnalysis, mdLite, isinValid, normalizeRows, qualityChecks, diffSnapshots, analyze, runControls, evalAlert, ideaScore, num, parseCsvText, matrixToRows, dateFromName };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
