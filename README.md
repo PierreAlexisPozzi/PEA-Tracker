@@ -54,6 +54,21 @@ Le commentaire rédigé dans la page n'a pas accès à internet : il s'appuie su
 relevé et sur la base de recherche datée. Seule l'analyse demandée en conversation rafraîchit
 les consensus.
 
+### Mise à jour quotidienne
+
+Une routine Claude tourne chaque jour ouvré vers 18 h 10, heure de Paris, après la
+clôture d'Euronext. Elle :
+
+- récupère le dernier cours de chaque ligne et des idées (`scripts/daily_update.py`) ;
+- évalue les alertes ;
+- cherche l'actualité des lignes qui bougent ;
+- le lundi, rafraîchit les consensus des analystes ;
+- écrit un « point du jour » et envoie une notification.
+
+Dans la page, la valorisation affichée devient « au cours du jour » : quantités du dernier
+relevé importé, cours de la routine. Importer un nouveau relevé reste nécessaire après un
+achat ou une vente. La procédure est décrite dans `.claude/skills/maj-quotidienne-pea`.
+
 ### Lecture du consensus
 
 Échelle FactSet affichée par Boursorama : 1 = Acheter, 2 = Renforcer, 3 = Conserver,
@@ -89,6 +104,9 @@ vigilance quand les consensus ont plus de 60 jours.
 ```bash
 # Vérifier / convertir un export BoursoBank (.csv ou .xlsx) en relevé JSON (document snapshots/<date>)
 python3 scripts/boursobank_to_json.py export.csv --date 2026-10-03 --cash 85.40 > releve.json
+
+# Cours du jour, valorisation et alertes à partir d'un export de la base de l'artifact
+python3 scripts/daily_update.py --db-dir <dossier> --out-quotes quotes.json --report rapport.md
 
 # Assembler la page en un seul fichier autonome (scripts en ligne) pour la publier
 python3 scripts/build_artifact.py --out dist/pea-tracker.html

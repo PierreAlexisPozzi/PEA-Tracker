@@ -9,6 +9,9 @@ Tableau de bord d'un PEA BoursoBank, publié comme artifact claude.ai privé :
   (`*.csv`, `*.xlsx` sont ignorés). Les relevés vivent dans la base de l'artifact.
 - Demande d'analyse, de point ou de mise à jour du portefeuille : suivre le skill
   `.claude/skills/analyse-pea/SKILL.md`.
+- Mise à jour quotidienne (routine du soir, jours ouvrés) : skill
+  `.claude/skills/maj-quotidienne-pea/SKILL.md`. Elle écrit seulement dans la base de
+  l'artifact (`quotes`, `alerts`, `research`, `analyses`) et ne modifie pas le dépôt.
 - Textes de l'interface en français, ton direct.
 
 ## Structure
@@ -18,6 +21,8 @@ Tableau de bord d'un PEA BoursoBank, publié comme artifact claude.ai privé :
 - `data/research.js` : base publique (consensus, fiches, idées), datée par `asOf`.
 - `scripts/build_artifact.py` : assemble la page en un fichier à publier.
 - `scripts/boursobank_to_json.py` : export BoursoBank vers document `snapshots/<date>`.
+- `scripts/daily_update.py` : cours du jour (Yahoo Finance, symbole `yahoo` des fiches),
+  valorisation au cours du jour, alertes, rapport.
 
 ## Vérifier un changement
 

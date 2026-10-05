@@ -62,7 +62,7 @@
     mode: 'pending',
     store: null,
     loaded: false,
-    snapshots: [], alerts: [], flows: [], analyses: [], research: {},
+    snapshots: [], alerts: [], flows: [], analyses: [], quotes: [], derived: null, research: {},
     settings: Object.assign({}, DEFAULT_SETTINGS),
     current: null,
     demo: null,
@@ -158,14 +158,14 @@
     init(cb) {
       this.onChange = cb;
       this.data = lsRead();
-      ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((k) => { this.data[k] = this.data[k] || {}; });
+      ['snapshots', 'alerts', 'flows', 'analyses', 'quotes', 'research'].forEach((k) => { this.data[k] = this.data[k] || {}; });
       this.data.settings = this.data.settings || {};
       this.emit();
     },
     emit() {
       const d = this.data;
       const list = (k) => Object.keys(d[k]).map((id) => Object.assign({ id }, d[k][id]));
-      this.onChange({ snapshots: list('snapshots'), alerts: list('alerts'), flows: list('flows'), analyses: list('analyses'), research: d.research, settings: d.settings });
+      this.onChange({ snapshots: list('snapshots'), alerts: list('alerts'), flows: list('flows'), analyses: list('analyses'), quotes: list('quotes'), research: d.research, settings: d.settings });
     },
     async set(coll, id, doc) {
       if (coll === 'settings') this.data.settings = clone(doc); else this.data[coll][id] = clone(doc);
@@ -179,7 +179,7 @@
     },
     exportAll() { return clone(this.data); },
     importAll(obj) {
-      ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((k) => { this.data[k] = obj[k] || {}; });
+      ['snapshots', 'alerts', 'flows', 'analyses', 'quotes', 'research'].forEach((k) => { this.data[k] = obj[k] || {}; });
       this.data.settings = obj.settings || {};
       lsWrite(this.data);
       this.emit();
@@ -187,14 +187,14 @@
   };
 
   function DbStore(db) {
-    const cache = { snapshots: {}, alerts: {}, flows: {}, analyses: {}, research: {}, settings: null };
+    const cache = { snapshots: {}, alerts: {}, flows: {}, analyses: {}, quotes: {}, research: {}, settings: null };
     const seen = new Set();
     let onChange = null;
     const emit = () => {
-      if (seen.size < 6) return;
+      if (seen.size < 7) return;
       onChange({
         snapshots: Object.values(cache.snapshots), alerts: Object.values(cache.alerts),
-        flows: Object.values(cache.flows), analyses: Object.values(cache.analyses), research: cache.research, settings: cache.settings || {}
+        flows: Object.values(cache.flows), analyses: Object.values(cache.analyses), quotes: Object.values(cache.quotes), research: cache.research, settings: cache.settings || {}
       });
     };
     const onErr = () => { seen.add('err'); toast('Connexion aux données interrompue. Rechargez la page.'); };
@@ -208,7 +208,7 @@
       kind: 'db',
       init(cb) {
         onChange = cb;
-        ['snapshots', 'alerts', 'flows', 'analyses', 'research'].forEach((coll) => {
+        ['snapshots', 'alerts', 'flows', 'analyses', 'quotes', 'research'].forEach((coll) => {
           db.collection(coll).onSnapshot((snap) => {
             const m = {};
             snap.docs.forEach((d) => { if (d.exists) m[d.id] = Object.assign({ id: d.id }, d.data()); });
@@ -255,10 +255,15 @@
     S.flows = (d.flows || []).sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
     S.research = d.research || {};
     S.analyses = d.analyses || [];
+    S.quotes = (d.quotes || []).filter((q) => q && q.date && q.prices).sort((a, b) => a.date < b.date ? -1 : 1);
     S.settings = Object.assign({}, DEFAULT_SETTINGS, d.settings || {});
+    const prevDerived = S.derived;
+    S.derived = derivedSnapshot();
     if (S.awaitId && S.snapshots.some((s) => s.id === S.awaitId)) { S.current = S.awaitId; S.awaitId = null; }
-    if (!S.current || !S.snapshots.some((s) => s.id === S.current)) {
-      S.current = S.snapshots.length ? S.snapshots[S.snapshots.length - 1].id : null;
+    // Des cours plus récents que le relevé affiché par défaut : basculer sur la valorisation du jour.
+    if (S.derived && (!S.current || (prevDerived && S.current === prevDerived.id) || (!prevDerived && S.snapshots.length && S.current === S.snapshots[S.snapshots.length - 1].id && !S.userPicked))) S.current = S.derived.id;
+    if (!S.current || !snapshotById(S.current)) {
+      S.current = S.derived ? S.derived.id : S.snapshots.length ? S.snapshots[S.snapshots.length - 1].id : null;
     }
     if (S.snapshots.length) S.demo = null;
     S.loaded = true;
@@ -486,12 +491,38 @@
 
   /* ================================================================ Analyse */
 
+  /**
+   * Relevé valorisé au cours du jour : quantités et PRU du dernier relevé importé,
+   * cours du document `quotes` le plus récent (écrit chaque soir par la routine).
+   */
+  function derivedSnapshot() {
+    const q = S.quotes[S.quotes.length - 1];
+    const base = S.snapshots[S.snapshots.length - 1];
+    if (!q || !base) return null;
+    if (q.date < base.date || (q.date === base.date && String(q.at || '') <= String(base.importedAt || ''))) return null;
+    const positions = base.positions.map((p) => {
+      const x = q.prices[p.isin];
+      if (!x || !ok(x.last)) return Object.assign({}, p, { stale: true });
+      return Object.assign({}, p, { last: x.last, dayVar: ok(x.dayVar) ? x.dayVar : null, amount: (p.qty || 0) * x.last, pnlReported: null, varReported: null });
+    });
+    return {
+      id: 'q-' + q.date, date: q.date, derived: true, baseId: base.id, baseDate: base.date, quoteAt: q.at,
+      source: q.source || 'Cours du jour', cash: base.cash, positions,
+      stale: positions.filter((p) => p.stale && !(inst(p.isin) || {}).nonTradable).map((p) => p.name)
+    };
+  }
+  function snapshotById(id) {
+    if (S.derived && S.derived.id === id) return S.derived;
+    return S.snapshots.find((s) => s.id === id) || null;
+  }
+
   function currentSnapshot() {
     if (S.demo) return S.demo;
-    return S.snapshots.find((s) => s.id === S.current) || null;
+    return snapshotById(S.current);
   }
   function previousSnapshot(snap) {
     if (!snap || S.demo) return null;
+    if (snap.derived) return S.snapshots.find((s) => s.id === snap.baseId) || null;
     const i = S.snapshots.findIndex((s) => s.id === snap.id);
     return i > 0 ? S.snapshots[i - 1] : null;
   }
@@ -626,9 +657,10 @@
       detail: 'Consensus mis à jour le ' + dateFR(researchAsOf()) + (rAge != null ? ' (il y a ' + rAge + ' j)' : '') + '.',
       action: rAge != null && rAge > st.researchStaleDays ? 'Demander à Claude de rafraîchir les consensus et les idées.' : '' });
     // P14 — fraîcheur du relevé
-    const sAge = daysSince(A.snap.date);
+    const relDate = A.snap.derived ? A.snap.baseDate : A.snap.date;
+    const sAge = daysSince(relDate);
     add({ id: 'P14', group: 'Cadre du PEA', title: 'Fraîcheur du relevé', status: sAge > st.staleDays ? 'warn' : 'ok',
-      detail: 'Relevé du ' + dateFR(A.snap.date) + ' (il y a ' + sAge + ' j).',
+      detail: 'Relevé (quantités) du ' + dateFR(relDate) + ' (il y a ' + sAge + ' j).' + (A.snap.derived ? ' Cours mis à jour le ' + dateFR(A.snap.date) + '.' : ''),
       action: sAge > st.staleDays ? 'Importer un nouvel export BoursoBank.' : '' });
     // P15 — plafond des versements
     const dep = depositsTotal();
@@ -785,7 +817,16 @@
     if (!el) return;
     const W = el.clientWidth;
     if (!W) return;
-    const pts = S.snapshots.map((s) => { const A = analyze(s); return { date: s.date, value: A.total, cost: A.cost + A.cash }; });
+    const byDate = {};
+    S.quotes.forEach((q) => {
+      const base = S.snapshots.filter((s) => s.date <= q.date).slice(-1)[0];
+      if (!base || base.date === q.date) return;
+      const positions = base.positions.map((p) => { const x = q.prices[p.isin]; return x && ok(x.last) ? Object.assign({}, p, { last: x.last, amount: (p.qty || 0) * x.last }) : p; });
+      const A = analyze({ id: 'q', date: q.date, cash: base.cash, positions });
+      byDate[q.date] = { date: q.date, value: A.total, cost: A.cost + A.cash };
+    });
+    S.snapshots.forEach((s) => { const A = analyze(s); byDate[s.date] = { date: s.date, value: A.total, cost: A.cost + A.cash }; });
+    const pts = Object.keys(byDate).sort().map((k) => byDate[k]);
     if (!pts.length) { el.innerHTML = ''; return; }
     const H = 220;
     const P = { l: 64, r: 16, t: 14, b: 30 };
@@ -872,12 +913,13 @@
     if (!S.loaded) { meta.innerHTML = '<span>Chargement des données…</span>'; }
     else if (!A) { meta.innerHTML = '<span>Aucun relevé importé</span><span>Consensus au ' + dateFR(researchAsOf()) + '</span>'; }
     else {
-      meta.innerHTML = '<span>' + (S.demo ? 'Exemple fictif' : 'Relevé du ' + dateFR(A.snap.date)) + '</span><span>' + A.lines.length + ' lignes</span><span>Consensus au ' + dateFR(researchAsOf()) + '</span>';
+      meta.innerHTML = '<span>' + (S.demo ? 'Exemple fictif' : A.snap.derived ? 'Cours du ' + dateFR(A.snap.date) + ', quantités du ' + dateFR(A.snap.baseDate) : 'Relevé du ' + dateFR(A.snap.date)) + '</span><span>' + A.lines.length + ' lignes</span><span>Consensus au ' + dateFR(researchAsOf()) + '</span>';
     }
     const sel = $('#snapSelect');
-    if (S.snapshots.length > 1 && !S.demo) {
+    const choices = (S.derived ? [S.derived] : []).concat(S.snapshots.slice().reverse());
+    if (choices.length > 1 && !S.demo) {
       sel.hidden = false;
-      sel.innerHTML = S.snapshots.slice().reverse().map((s) => '<option value="' + esc(s.id) + '"' + (s.id === S.current ? ' selected' : '') + '>Relevé du ' + dateFR(s.date) + '</option>').join('');
+      sel.innerHTML = choices.map((s) => '<option value="' + esc(s.id) + '"' + (s.id === S.current ? ' selected' : '') + '>' + (s.derived ? 'Cours du ' + dateFR(s.date) : 'Relevé du ' + dateFR(s.date)) + '</option>').join('');
     } else sel.hidden = true;
     const badge = $('#storeBadge');
     badge.className = 'store-badge' + (S.mode === 'db' ? ' cloud' : '');
@@ -917,6 +959,13 @@
       '<button class="btn" type="button" data-act="demo">Voir un exemple fictif</button></div></div>';
   }
 
+  function quotesBanner(A) {
+    if (!A || !A.snap.derived) return '';
+    const s = A.snap;
+    return '<div class="banner"><span><b>Valorisation au cours du ' + esc(dateTimeFR(s.quoteAt)) + '</b> (mise à jour automatique), avec les quantités du relevé du ' + dateFR(s.baseDate) + '. Si vous avez acheté ou vendu depuis, importez un nouveau relevé.' +
+      (s.stale.length ? ' Cours non mis à jour : ' + esc(s.stale.join(', ')) + '.' : '') + '</span></div>';
+  }
+
   function demoBanner() {
     return S.demo ? '<div class="banner"><span><b>Exemple fictif.</b> Ces positions ne sont pas les vôtres.</span><button class="btn sm" type="button" data-act="exit-demo">Quitter l’exemple</button></div>' : '';
   }
@@ -928,7 +977,8 @@
     const last = S.snapshots.length ? S.snapshots[S.snapshots.length - 1] : null;
     const age = last ? daysSince(last.date) : null;
     const stale = age != null && age > 7;
-    const when = last ? 'Dernier relevé : ' + dateFR(last.date) + (age > 0 ? ' (il y a ' + age + ' j)' : ' (aujourd’hui)') : 'Aucun relevé enregistré';
+    const q = S.quotes[S.quotes.length - 1];
+    const when = (last ? 'Dernier relevé : ' + dateFR(last.date) + (age > 0 ? ' (il y a ' + age + ' j)' : ' (aujourd’hui)') : 'Aucun relevé enregistré') + (q ? ' · cours mis à jour le ' + dateTimeFR(q.at) : '');
     return '<section class="drop update' + (stale ? ' stale' : '') + '" aria-labelledby="updTitle">' +
       '<div class="update-text"><b id="updTitle">Mettre à jour mon relevé</b>' +
       '<span class="small">' + esc(when) + (stale ? ' · <b>à mettre à jour</b>' : '') + '</span>' +
@@ -951,7 +1001,7 @@
       '<div class="kpi"><span class="label">Valeur du PEA</span><span class="value hero num">' + eur(A.total, 0) + '</span><span class="sub">' + (A.cash ? 'dont ' + eur(A.cash, 0) + ' de liquidités' : 'hors liquidités (non incluses dans l’export)') + '</span></div>' +
       '<div class="kpi"><span class="label">+/- value latente</span><span class="value num ' + tone(A.pnl) + '">' + sEur(A.pnl, 0) + '</span><span class="sub num">' + sPct(A.pnlPct) + ' sur ' + eur(A.cost, 0) + ' investis</span></div>' +
       (A.hasNonTradable ? '<div class="kpi"><span class="label">Hors titres radiés</span><span class="value num ' + tone(A.pnlT) + '">' + sEur(A.pnlT, 0) + '</span><span class="sub num">' + sPct(A.pnlTPct) + ' sur les lignes cotées</span></div>' : '') +
-      '<div class="kpi"><span class="label">Variation du jour</span><span class="value num ' + tone(A.day) + '">' + sEur(A.day, 2) + '</span><span class="sub">estimée sur le relevé</span></div>' +
+      '<div class="kpi"><span class="label">Variation du jour</span><span class="value num ' + tone(A.day) + '">' + sEur(A.day, 2) + '</span><span class="sub">' + (A.snap.derived ? 'séance du ' + dateFR(A.snap.date) : 'estimée sur le relevé') + '</span></div>' +
       '<div class="kpi"><span class="label">Lignes</span><span class="value num">' + A.lines.length + '</span><span class="sub">' + A.counts.etf + ' ETF · ' + A.counts.stocks + ' actions</span></div></div>';
 
     const health = '<div class="card section"><div class="section-head"><h2>Santé du portefeuille</h2><button class="btn ghost sm" type="button" data-goto="controles">Voir les ' + C.length + ' contrôles</button></div>' +
@@ -983,7 +1033,7 @@
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
       '</tbody></table></div><p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
 
-    return demoBanner() + updateCard() + analysisTeaser() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
+    return demoBanner() + updateCard() + quotesBanner(A) + analysisTeaser() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
   }
 
   /* ---------------- Positions */
@@ -996,7 +1046,7 @@
     const lines = A.lines.slice().sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; });
     const th = (key, label, r) => '<th class="' + (r ? 'r' : '') + '" aria-sort="' + (k === key ? (d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + key + '">' + label + (k === key ? (d > 0 ? ' ↑' : ' ↓') : '') + '</button></th>';
     const maxW = Math.max(S.settings.lineAlert, Math.max.apply(null, A.lines.map((l) => l.weight)));
-    return demoBanner() + '<div class="section"><div class="section-head"><h2>Positions</h2><span class="muted small">Cliquez sur une ligne pour sa fiche.</span></div>' +
+    return demoBanner() + quotesBanner(A) + '<div class="section"><div class="section-head"><h2>Positions</h2><span class="muted small">Cliquez sur une ligne pour sa fiche.</span></div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + th('label', 'Ligne') + th('qty', 'Qté', 1) + th('pru', 'PRU', 1) + th('last', 'Cours', 1) + th('dayVar', 'Jour', 1) + th('value', 'Valeur', 1) + th('weight', 'Poids') + th('pnl', '+/- value', 1) + th('pnlPct', '%', 1) + '<th>Analystes</th>' + th('upside', 'Potentiel', 1) + '<th>Avis</th></tr></thead><tbody>' +
       lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '">' +
         '<td><div class="name-cell"><b>' + esc(l.label) + '</b><span>' + esc(l.isin) + ' · ' + esc(l.m.kind === 'etf' ? 'ETF' : (l.m.market || 'Action')) + '</span></div></td>' +
@@ -1140,7 +1190,7 @@
         : '<p class="kpi" style="padding:0"><span class="value num">' + eur(dep, 0) + '</span><span class="sub">versés sur 150 000 € · reste ' + eur(Math.max(0, PEA_CEILING - dep), 0) + '</span></p><div class="meter" role="img" aria-label="' + pct(dep / PEA_CEILING * 100) + ' du plafond"><i style="width:' + clamp(dep / PEA_CEILING * 100, 0.5, 100) + '%"></i></div>') +
       '<p class="small muted">Seuls les versements comptent (pas les plus-values). Les mouvements saisis de type Versement et Retrait ajustent le total.</p></div>';
     const hist = '<div class="card section"><div class="section-head"><h2>Évolution de la valeur</h2><div class="legend"><span><i style="background:var(--s1)"></i>Valeur du PEA</span><span><i style="background:var(--s2)"></i>Montant investi</span></div></div>' +
-      (S.demo ? '<p class="muted">Disponible avec vos propres relevés.</p>' : '<div id="histChart"></div>' + (S.snapshots.length < 2 ? '<p class="small muted">Un seul relevé pour l’instant : la courbe se dessinera à partir du prochain import.</p>' : '')) + '</div>';
+      (S.demo ? '<p class="muted">Disponible avec vos propres relevés.</p>' : '<div id="histChart"></div>' + (S.snapshots.length + S.quotes.length < 2 ? '<p class="small muted">Un seul point pour l’instant : la courbe se complète à chaque import et à chaque mise à jour quotidienne des cours.</p>' : '')) + '</div>';
     const snaps = S.demo ? '' : '<div class="section"><h2>Relevés enregistrés</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th class="r">Lignes</th><th class="r">Valeur</th><th class="r">+/- value</th><th>Importé le</th><th></th></tr></thead><tbody>' +
       S.snapshots.slice().reverse().map((s) => { const a = analyze(s); return '<tr><td class="num">' + dateFR(s.date) + '</td><td class="r">' + s.positions.length + '</td><td class="r">' + eur(a.total, 0) + '</td><td class="r ' + tone(a.pnl) + '">' + sEur(a.pnl, 0) + '</td><td class="small muted">' + (s.importedAt ? dateFR(s.importedAt) : '—') + '</td><td><div class="actions"><button class="btn sm" type="button" data-snap-show="' + esc(s.id) + '">Afficher</button><button class="btn sm danger" type="button" data-snap-del="' + esc(s.id) + '">Supprimer</button></div></td></tr>'; }).join('') +
       '</tbody></table></div></div>';
@@ -1180,7 +1230,7 @@
 
   /* ================================================================ Analyse */
 
-  const TRIGGER_LABEL = { import: 'après import', demande: 'à la demande', claude: 'par Claude, avec recherche web', apercu: 'aperçu' };
+  const TRIGGER_LABEL = { import: 'après import', demande: 'à la demande', claude: 'par Claude, avec recherche web', routine: 'mise à jour quotidienne', apercu: 'aperçu' };
   const STATUS_LABEL = { ok: 'Conforme', warn: 'Vigilance', alert: 'Alerte', info: 'Info' };
   const CLAUDE_ERR = {
     not_granted: 'Vous n’avez pas autorisé cette page à utiliser Claude.',
@@ -1382,7 +1432,7 @@
     const sample = await getSample();
     if (!sample) { toast('Le commentaire de Claude est disponible dans l’artifact claude.ai.'); return; }
     const base = given || S.analyses.find((a) => a.id === id);
-    const snap = base && S.snapshots.find((s) => s.id === base.snapshotId);
+    const snap = base && snapshotById(base.snapshotId);
     if (!base || !snap) { toast('Le relevé de cette analyse n’existe plus.'); return; }
     if (S.claudeRun) S.claudeRun.ctl.abort();
     const run = { id, text: '', ctl: new AbortController() };
@@ -1419,7 +1469,7 @@
   function claudeInner(view) {
     const run = S.claudeRun && S.claudeRun.id === view.id ? S.claudeRun : null;
     const c = view.claude;
-    const canRun = !run && !view.live && S.sample && !S.sampleOff && !S.readOnly && view.author !== 'claude-session';
+    const canRun = !run && !view.live && S.sample && !S.sampleOff && !S.readOnly && view.author !== 'claude-session' && view.author !== 'routine';
     let head = '<div class="section-head"><h2>Commentaire de Claude</h2><div class="actions">';
     if (run) head += '<button class="btn sm" type="button" data-act="claude-stop">Arrêter</button>';
     if (canRun) head += '<button class="btn sm" type="button" data-act="claude-redo" data-id="' + esc(view.id) + '">' + (c && c.text ? 'Régénérer' : 'Demander à Claude') + '</button>';
@@ -1432,7 +1482,7 @@
     else if (view.live) body = '<p class="muted">Cliquez sur « Nouvelle analyse » pour enregistrer cette analyse et obtenir le commentaire de Claude.</p>';
     else if (S.sample && !S.sampleOff) body = '<p class="muted">Pas encore de commentaire pour cette analyse.</p>';
     else body = '<p class="muted">Le commentaire rédigé par Claude s’obtient dans l’artifact claude.ai. L’analyse chiffrée ci-dessus est complète sans lui.</p>';
-    const meta = c && c.at && c.status !== 'error' && !run ? '<p class="small muted">Rédigé le ' + esc(dateTimeFR(c.at)) + (c.source === 'session' ? ' dans une conversation avec Claude, consensus vérifiés sur le web' : ' à partir des données de la page, sans accès à internet') + '.</p>' : '';
+    const meta = c && c.at && c.status !== 'error' && !run ? '<p class="small muted">Rédigé le ' + esc(dateTimeFR(c.at)) + (c.source === 'session' ? ' dans une conversation avec Claude, consensus vérifiés sur le web' : c.source === 'routine' ? ' par la routine quotidienne, cours et actualités vérifiés sur le web' : ' à partir des données de la page, sans accès à internet') + '.</p>' : '';
     return head + meta + '<div class="prose" id="claudeBody">' + body + '</div>';
   }
 
@@ -1466,10 +1516,10 @@
     const d = view.delta;
     const dTxt = (v, f) => d ? '<span class="sub num ' + tone(v) + '">' + f(v) + ' depuis le ' + dateFR(d.prevDate) + '</span>' : '<span class="sub">premier relevé</span>';
     const sel = list.length > 1 ? '<label class="sr" for="anaSelect">Analyse affichée</label><select class="input" id="anaSelect">' + list.map((a) => '<option value="' + esc(a.id) + '"' + (doc && a.id === doc.id ? ' selected' : '') + '>' + esc(dateTimeFR(a.createdAt)) + ' · ' + esc(TRIGGER_LABEL[a.trigger] || '') + '</option>').join('') + '</select>' : '';
-    const meta = view.live ? (S.demo ? 'Analyse de l’exemple fictif.' : 'Analyse instantanée, pas encore enregistrée.') : 'Générée le ' + dateTimeFR(view.createdAt) + ' · ' + (TRIGGER_LABEL[view.trigger] || '') + ' · consensus au ' + dateFR(view.researchAsOf);
+    const meta = view.live ? (S.demo ? 'Analyse de l’exemple fictif.' : 'Analyse instantanée, pas encore enregistrée.' + (snap.derived ? ' Cours du ' + dateFR(snap.date) + ', quantités du ' + dateFR(snap.baseDate) + '.' : '')) : 'Générée le ' + dateTimeFR(view.createdAt) + ' · ' + (TRIGGER_LABEL[view.trigger] || '') + ' · consensus au ' + dateFR(view.researchAsOf);
     const lvl = (l) => chip(l === 'alert' ? 'alert' : l === 'warn' ? 'warn' : 'info', STATUS_LABEL[l] || 'Info');
     return demoBanner() +
-      '<div class="section-head"><div><h2>Analyse du relevé du ' + dateFR(snap.date) + '</h2><p class="small muted">' + esc(meta) + '</p></div>' +
+      '<div class="section-head"><div><h2>' + (snap.derived ? 'Analyse au cours du ' : 'Analyse du relevé du ') + dateFR(snap.date) + '</h2><p class="small muted">' + esc(meta) + '</p></div>' +
       '<div class="actions">' + sel + '<button class="btn primary" type="button" data-act="new-analysis"' + (S.demo || S.readOnly ? ' disabled' : '') + '>Nouvelle analyse</button></div></div>' +
       '<div class="banner"><span>' + esc(view.headline) + '</span></div>' +
       '<div class="kpis"><div class="kpi"><span class="label">Valeur du PEA</span><span class="value num">' + eur(k.total, 0) + '</span>' + dTxt(d && d.total, (v) => sEur(v, 0)) + '</div>' +
@@ -1692,7 +1742,7 @@
       }
       if (t.dataset.cfilter) { S.ctrlFilter = t.dataset.cfilter; return renderAll(); }
       if (t.dataset.isort) { S.ideaSort = t.dataset.isort; return renderAll(); }
-      if (t.dataset.snapShow) { S.current = t.dataset.snapShow; showTab('synthese'); return renderAll(); }
+      if (t.dataset.snapShow) { S.current = t.dataset.snapShow; S.userPicked = true; showTab('synthese'); return renderAll(); }
       if (t.dataset.snapDel) {
         if (t.dataset.armed) {
           const sid = t.dataset.snapDel;
@@ -1769,7 +1819,7 @@
     document.addEventListener('change', (e) => {
       const id = e.target.id;
       if (id === 'fileInput') { const f = e.target.files[0]; e.target.value = ''; if (f) handleFile(f); return; }
-      if (id === 'snapSelect') { S.current = e.target.value; S.analysisId = null; return renderAll(); }
+      if (id === 'snapSelect') { S.current = e.target.value; S.userPicked = true; S.analysisId = null; return renderAll(); }
       if (id === 'anaSelect') { S.analysisId = e.target.value; return renderAll(); }
       if (id === 'al-scope' || id === 'al-target' || id === 'al-metric') {
         const d = readAlertForm();
