@@ -58,8 +58,10 @@ jour). Le premier lundi du mois, faire de même pour les idées (`idea: true`).
 
 Écrire chaque changement dans `research/<ISIN>` : `{ "consensus": { buy, outperform, hold,
 underperform, sell, median, target, price, priceDate }, "facts": [...] }`. Un champ écrit
-remplace celui de `data/research.js`, et `facts` est remplacé en entier. Mettre à jour
-`research/_meta` : `{ "asOf": "<date>", "source": "Consensus FactSet via Boursorama" }`.
+remplace celui de `data/research.js`, et `facts` est remplacé en entier. Après la
+vérification, **même si rien n'a changé**, écrire `research/_meta` :
+`{ "asOf": "<date>", "source": "Consensus FactSet via Boursorama" }` ; c'est la date de
+consensus affichée par la page.
 
 ## 5. Point du jour
 
@@ -76,14 +78,16 @@ remplace celui de `data/research.js`, et `facts` est remplacé en entier. Mettre
 
 Si le dernier relevé importé porte la même date que les cours, utiliser son id comme
 `snapshotId` à la place de `q-<date>`. Si le document existe déjà (deuxième passage le
-même jour), le lire avec `get` et passer sa `version` en `if_version`.
+même jour), le lire avec `get`, le réécrire en entier (titre et texte cohérents avec les
+nouveaux cours) et passer sa `version` en `if_version`.
 
 `claude.text` : 250 mots au plus, sections `## Synthèse du jour`, `## Cours`, `## Alertes`,
 `## Actualités`, `## À faire`. Uniquement des faits vérifiés, chiffres du rapport à l'appui.
 
 ## 6. Message final
 
-C'est le texte de la notification : 4 lignes au plus, en français.
+C'est le texte de la notification : la routine l'envoie elle-même, ne pas appeler
+`PushNotification`. 4 lignes au plus, en français.
 1. Valeur au cours du jour et variation de la séance.
 2. Alertes déclenchées, s'il y en a.
 3. Actualité importante, s'il y en a.
