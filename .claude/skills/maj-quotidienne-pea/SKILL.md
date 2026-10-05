@@ -75,7 +75,8 @@ remplace celui de `data/research.js`, et `facts` est remplacé en entier. Mettre
 ```
 
 Si le dernier relevé importé porte la même date que les cours, utiliser son id comme
-`snapshotId` à la place de `q-<date>`.
+`snapshotId` à la place de `q-<date>`. Si le document existe déjà (deuxième passage le
+même jour), le lire avec `get` et passer sa `version` en `if_version`.
 
 `claude.text` : 250 mots au plus, sections `## Synthèse du jour`, `## Cours`, `## Alertes`,
 `## Actualités`, `## À faire`. Uniquement des faits vérifiés, chiffres du rapport à l'appui.
