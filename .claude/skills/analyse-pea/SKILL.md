@@ -53,6 +53,12 @@ l'ancienne date de consensus. Mettre à jour `asOf`, les blocs `consensus`, `fac
 `risks` et `view`. Ajouter une fiche pour tout ISIN inconnu de la base. Revoir les idées
 (ajouts, retraits motivés dans `excluded`).
 
+Idées ETF (`etfIdea: true`) : pas de consensus d'analystes. Vérifier une fois par mois les
+frais, l'encours et l'éligibilité PEA (fiche émetteur ou comparatif daté), mettre à jour
+`price`, `perf1y` et `aumDate`, et motiver tout retrait dans `excludedEtfs`. Chaque fiche a
+un symbole `yahoo` pour que la routine suive son cours. La priorité affichée est calculée
+par la page (`etfIdeas` dans `assets/app.js`) : ne pas la figer dans la base.
+
 ## 3. Calculer
 
 `python3 scripts/daily_update.py --db-dir <dossier de l'export> --out-quotes q.json --report r.md`

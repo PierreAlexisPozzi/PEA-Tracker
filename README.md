@@ -36,7 +36,7 @@ les alertes.
 | Contrôles | 22 contrôles en vert / orange / rouge : qualité du relevé, concentration, pertes, titres radiés, socle diversifié, doublons titres/ETF, analystes, cadre PEA |
 | Alertes | Seuils sur le cours, la +/- value, le poids, la variation du jour, le potentiel, un secteur ou le portefeuille ; alertes recommandées en un clic |
 | Flux | Chaîne de traitement d'un relevé, évolution de la valeur, plafond des versements (150 000 €), journal des mouvements, relevés enregistrés |
-| Idées mid caps | Valeurs moyennes non détenues avec consensus à l'achat, classées par un score sur 100 |
+| Idées | ETF éligibles PEA avec une priorité calculée sur le portefeuille (zones, secteurs, doublons, prix de la part), et mid caps non détenues classées par un score sur 100 |
 
 ### Analyses
 

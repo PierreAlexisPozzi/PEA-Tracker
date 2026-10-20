@@ -185,8 +185,72 @@ window.PEA_RESEARCH = {
       thesis: 'Logiciels et équipements de découpe pour la mode, l’automobile et l’ameublement ; modèle de plus en plus récurrent (SaaS).',
       risks: ['Potentiel limité (~18 %) ; secteurs clients cycliques.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPLSS/' }]
+    },
+
+    /* ------------------------------------------------- Idées ETF (PEA) */
+    'FR0013412020': {
+      yahoo: 'PAEEM.PA', name: 'Amundi PEA Émergent ESG Transition', short: 'ETF Pays émergents', ticker: 'PAEEM',
+      kind: 'etf', etfIdea: true, sector: 'Émergents diversifié', zones: { 'Pays émergents': 1 },
+      ter: 0.30, aum: 950, aumDate: '2026-10-16', replication: 'Synthétique', index: 'MSCI EM ESG Broad Transition (filtre ESG)',
+      price: 34.815, priceDate: '2026-10-20', perf1y: 23.0,
+      role: 'Ajoute les pays émergents (Chine, Inde, Taïwan, Corée…), absents de ton PEA.',
+      risks: ['Volatilité plus forte et risque politique ; indice filtré ESG, un peu différent du MSCI Emerging Markets classique.'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0013411980': {
+      yahoo: 'PTPXE.PA', name: 'Amundi PEA Japon (TOPIX)', short: 'ETF Japon', ticker: 'PTPXE',
+      kind: 'etf', etfIdea: true, sector: 'Japon diversifié', zones: { 'Asie-Pacifique': 1 },
+      ter: 0.20, aum: 210, aumDate: '2026-10-16', replication: 'Synthétique', index: 'TOPIX (≈ 1 700 sociétés japonaises)',
+      price: 39.625, priceDate: '2026-10-20', perf1y: 23.7,
+      role: 'Diversifie hors Europe et hors États-Unis, avec des frais bas.',
+      risks: ['Exposition au yen (non couverte) ; le Japon ne pèse qu’environ 5 % dans ton ETF Monde.'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0011871128': {
+      yahoo: 'PSP5.PA', name: 'Amundi PEA S&P 500', short: 'ETF S&P 500', ticker: 'PSP5',
+      kind: 'etf', etfIdea: true, sector: 'États-Unis diversifié', zones: { 'Amérique du Nord': 1 }, overlapCore: 70,
+      ter: 0.12, aum: 1540, aumDate: '2026-10-16', replication: 'Synthétique', index: 'S&P 500 (500 grandes sociétés américaines)',
+      price: 60.29, priceDate: '2026-10-20', perf1y: 17.1,
+      role: 'Exposition aux États-Unis parmi les moins chères du PEA.',
+      risks: ['Recoupe largement ton ETF Monde (≈ 70 % américain) ; dollar non couvert.'],
+      sources: [{ label: 'Liste ETF PEA (09/10/2026)', url: 'https://pea.fr/guides/etf-pea-eligibles-guide-complet-frais-encours/' }]
+    },
+    'LU1834986900': {
+      yahoo: 'HLT.PA', name: 'Amundi STOXX Europe 600 Healthcare', short: 'ETF Santé Europe', ticker: 'HLT',
+      kind: 'etf', etfIdea: true, sector: 'Santé', zones: { 'Europe': 1 }, defensive: true,
+      ter: 0.30, aum: 895, aumDate: '2025-12-31', replication: 'Synthétique', index: 'STOXX Europe 600 Health Care',
+      price: 155.34, priceDate: '2026-10-20', perf1y: 3.9,
+      role: 'Secteur défensif (Novo Nordisk, AstraZeneca, Roche…) qui équilibre l’énergie, l’industrie et la tech.',
+      risks: ['Concentré sur quelques géants pharmaceutiques ; une part coûte ~155 €.'],
+      sources: [{ label: 'Fiche ETF (francetransactions)', url: 'https://www.francetransactions.com/bourse/etf/amundi-stoxx-europe-600-hlthcare-etf-acc-lu1834986900.html' }]
+    },
+    'LU1598689153': {
+      yahoo: 'MMS.PA', name: 'Amundi MSCI EMU Small Cap ESG Broad Transition', short: 'ETF Small caps zone euro', ticker: 'MMS',
+      kind: 'etf', etfIdea: true, sector: 'Small caps zone euro', zones: { 'Europe': 1 }, smallcaps: true,
+      ter: 0.40, aum: 570, aumDate: '2026-10-16', replication: 'Physique (distribuant)', index: 'MSCI EMU Small Cap ESG Broad Transition',
+      price: 422.45, priceDate: '2026-10-20', perf1y: 6.0,
+      role: 'Petites et moyennes valeurs de la zone euro en une seule ligne, sans choisir de titres.',
+      risks: ['Part chère (~420 €) ; frais les plus élevés de la sélection ; performance indiquée hors dividendes (part distribuante).'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0011871110': {
+      yahoo: 'PUST.PA', name: 'Amundi PEA Nasdaq-100', short: 'ETF Nasdaq-100', ticker: 'PUST',
+      kind: 'etf', etfIdea: true, sector: 'Technologie', zones: { 'Amérique du Nord': 1 }, overlapCore: 45, overlapSector: 'Technologie',
+      ter: 0.30, aum: 1340, aumDate: '2026-10-16', replication: 'Synthétique', index: 'Nasdaq-100',
+      price: 105.38, priceDate: '2026-10-20', perf1y: 20.2,
+      role: 'Croissance technologique américaine (Apple, Microsoft, Nvidia…).',
+      risks: ['Très concentré sur une dizaine de géants de la tech, déjà présents dans ton ETF Monde ; volatil.'],
+      sources: [{ label: 'Liste ETF PEA (09/10/2026)', url: 'https://pea.fr/guides/etf-pea-eligibles-guide-complet-frais-encours/' }]
     }
   },
+
+  /* ETF examinés mais écartés. */
+  excludedEtfs: [
+    { name: 'Amundi PEA Global (MSCI ACWI, GPEA)', reason: 'Lancé en juillet 2026, ~80 M€ d’encours : trop jeune. Ton ETF Monde couvre déjà les pays développés.' },
+    { name: 'Amundi MSCI World (CW8)', reason: 'Mêmes sociétés que ton ETF Monde, mais 0,38 % de frais contre 0,20 %.' },
+    { name: 'BNP Paribas Easy MSCI Europe Small Caps (LU1291101555)', reason: 'Non éligible au PEA selon plusieurs sources.' },
+    { name: 'Amundi Russell 2000 (RS2K)', reason: 'Petites valeurs américaines, part à ~370 € et frais de 0,35 % : pas prioritaire pour ce portefeuille.' }
+  ],
 
   /* Valeurs examinées mais écartées de la sélection, avec la raison. */
   excluded: [

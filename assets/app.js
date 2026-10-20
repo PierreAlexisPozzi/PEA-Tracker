@@ -70,6 +70,7 @@
     posSort: { key: 'value', dir: -1 },
     ctrlFilter: 'all',
     ideaSort: 'score',
+    ideaKind: 'all',
     readOnly: false,
     awaitId: null,
     pending: null,
@@ -1199,7 +1200,71 @@
 
   /* ---------------- Idées */
 
+  /**
+   * Idées d'ETF éligibles PEA. La priorité est calculée sur le portefeuille affiché :
+   * ce que l'ETF ajoute (hors Europe, défensif, small caps, frais bas) moins ce qu'il
+   * recoupe (ETF Monde, secteur déjà lourd) et une part trop chère pour la taille du PEA.
+   */
+  function etfIdeas(A) {
+    const st = S.settings;
+    const held = new Set(A ? A.lines.map((l) => l.isin) : []);
+    const q = S.quotes[S.quotes.length - 1];
+    const sectorW = (name) => A ? sum(A.lines.filter((l) => l.m.sector === name), (l) => l.weight) : 0;
+    const eu = A ? (A.zones.find((z) => z.name === 'Europe') || { weight: 0 }).weight : 100;
+    const outside = 100 - eu;
+    const core = sectorW('Monde diversifié');
+    const cyc = A ? sum(A.lines.filter((l) => /Énergie|Industrie|Technologie/.test(l.m.sector || '')), (l) => l.weight) : 0;
+    return allIsins().map((i) => Object.assign({ isin: i }, inst(i))).filter((m) => m.etfIdea && !held.has(m.isin)).map((m) => {
+      const qp = q && q.prices && q.prices[m.isin];
+      const price = qp && ok(qp.last) ? qp.last : m.price;
+      const priceDate = qp && ok(qp.last) ? q.date : m.priceDate;
+      const ticket = A && A.total && ok(price) ? price / A.total * 100 : null;
+      const plus = [];
+      const minus = [];
+      let pts = 0;
+      const outsideShare = 1 - ((m.zones || {}).Europe || 0);
+      if (A && outsideShare > 0.5) {
+        if (outside < st.outsideEuropeMin) { pts += 2; plus.push('Augmente ton exposition hors Europe (' + pct(outside) + ' aujourd’hui, minimum conseillé ' + st.outsideEuropeMin + ' %).'); }
+        else { pts += 1; plus.push('Diversifie hors Europe.'); }
+      }
+      if (m.overlapCore && core > 0) { pts -= 2; minus.push('Recoupe ton ETF Monde : environ ' + m.overlapCore + ' % de son contenu y est déjà.'); }
+      if (m.overlapSector && sectorW(m.overlapSector) >= 10) { pts -= 1; minus.push('Tu as déjà ' + pct(sectorW(m.overlapSector)) + ' du PEA en ' + m.overlapSector.toLowerCase() + '.'); }
+      if (m.defensive && cyc >= 40) { pts += 1; plus.push('Secteur défensif face à ' + pct(cyc) + ' d’énergie, d’industrie et de tech dans ton PEA.'); }
+      if (m.smallcaps) { pts += 1; plus.push('Petites et moyennes valeurs sans choisir de titres.'); }
+      if (ok(m.ter) && m.ter <= 0.2) { pts += 1; plus.push('Frais bas (' + nb(m.ter, 2) + ' % par an).'); }
+      if (ok(m.aum) && m.aum < 300) minus.push('Encours modeste (' + nb(m.aum, 0) + ' M€).');
+      if (ok(ticket) && ticket > 12) { pts -= 2; minus.push('Une part coûte ' + eur(price, 0) + ', soit ' + pct(ticket) + ' du PEA : trop lourd aujourd’hui.'); }
+      const level = pts >= 2 ? 'Haute' : pts >= 1 ? 'Moyenne' : 'Faible';
+      return Object.assign(m, { price, priceDate, ticket, pts, level, plus, minus });
+    }).sort((a, b) => b.pts - a.pts || (a.ter || 0) - (b.ter || 0));
+  }
+
   function renderIdees(A) {
+    const kind = S.ideaKind || 'all';
+    const kseg = (k, label) => '<button class="seg" type="button" data-ikind="' + k + '" aria-pressed="' + (kind === k) + '">' + label + '</button>';
+    const srcLinks = (m) => (m.sources || []).map((x) => '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.label) + '</a>').join(' · ');
+
+    // ETF
+    const etfs = etfIdeas(A);
+    const core = A ? sum(A.lines.filter((l) => l.m.sector === 'Monde diversifié'), (l) => l.weight) : null;
+    const levelCls = { Haute: 'buy', Moyenne: 'hold', Faible: 'none' };
+    const etfCard = (m) => '<article class="card idea"><div class="idea-head"><div><span class="eyebrow">' + esc(m.ticker) + ' · ' + esc(m.isin) + '</span><h3>' + esc(m.short || m.name) + '</h3><p class="small muted">' + esc(m.name) + '</p></div>' +
+      '<div class="score"><span class="reco r-' + levelCls[m.level] + '">Priorité ' + m.level.toLowerCase() + '</span></div></div>' +
+      '<p class="small">' + esc(m.role) + '</p>' +
+      '<div class="facts"><div><span>Frais</span><b>' + (ok(m.ter) ? nb(m.ter, 2) + ' %' : '—') + '</b></div><div><span>Encours</span><b>' + (ok(m.aum) ? nb(m.aum, 0) + ' M€' : '—') + '</b></div><div><span>1 part</span><b>' + eur(m.price) + '</b></div>' +
+      '<div><span>Perf. 1 an</span><b class="' + tone(m.perf1y) + '">' + sPct(m.perf1y, 0) + '</b></div><div><span>Réplication</span><b>' + esc(String(m.replication || '—').split(' ')[0]) + '</b></div><div><span>1 part / PEA</span><b>' + (ok(m.ticket) ? pct(m.ticket) : '—') + '</b></div></div>' +
+      (m.plus.length ? '<ul class="plain">' + m.plus.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+      (m.minus.length ? '<p class="small muted"><b>À savoir :</b> ' + esc(m.minus.join(' ')) + '</p>' : '') +
+      (m.risks && m.risks.length ? '<p class="small muted"><b>Risque :</b> ' + esc(m.risks.join(' ')) + '</p>' : '') +
+      '<p class="small">' + srcLinks(m) + ' <span class="muted">· indice ' + esc(m.index || '') + ' · cours du ' + dateFR(m.priceDate) + '</span></p></article>';
+    const etfSection = '<div class="section"><div class="section-head"><h2>ETF éligibles PEA</h2><span class="small muted">Priorité calculée sur ton portefeuille</span></div>' +
+      (A && ok(core) && core < S.settings.coreTarget ? '<div class="banner"><span><b>Priorité n°1 : ton ETF Monde</b> (' + pct(core) + ' du PEA pour une cible de ' + S.settings.coreTarget + ' %). Les ETF ci-dessous sont des compléments, à 5–10 % du PEA chacun.</span></div>' : '') +
+      '<div class="grid-3">' + etfs.map(etfCard).join('') + '</div>' +
+      '<div class="grid-2"><div class="card section"><h3>ETF écartés</h3><ul class="plain">' + (R.excludedEtfs || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div>' +
+      '<div class="card section"><h3>Lecture de la priorité</h3><ul class="plain"><li>Haute : comble un manque du portefeuille (zone, secteur) à frais raisonnables.</li><li>Moyenne : utile, mais recoupe en partie ce que tu détiens.</li><li>Faible : doublon important ou part trop chère pour la taille du PEA.</li></ul>' +
+      '<p class="small muted">Performance sur 1 an indicative (variation du cours) ; elle ne préjuge pas de l’avenir. Vérifie l’éligibilité PEA et le DIC sur BoursoBank avant d’acheter.</p></div></div></div>';
+
+    // Mid caps
     const ideas = rankedIdeas(A);
     const key = S.ideaSort;
     ideas.sort((a, b) => key === 'up' ? b.sc.up - a.sc.up : key === 'per' ? (a.per ? a.per[0] : 99) - (b.per ? b.per[0] : 99) : b.sc.score - a.sc.score);
@@ -1217,15 +1282,17 @@
         '<div><span>PER 2026e</span><b>' + (m.per ? nb(m.per[0], 1) : '—') + '</b></div><div><span>PER 2027e</span><b>' + (m.per ? nb(m.per[1], 1) : '—') + '</b></div><div><span>Rendement</span><b>' + (ok(m.yield) ? pct(m.yield) : '—') + '</b></div></div>' +
         (ok(ticket) ? '<p class="small"><b>Ticket minimum :</b> 1 titre = ' + pct(ticket) + ' du PEA' + (ticket > 12 ? ' (trop lourd pour une seule ligne aujourd’hui)' : '') + '.</p>' : '') +
         '<p class="small">' + esc(m.thesis) + '</p>' + (m.risks && m.risks.length ? '<p class="small muted"><b>Risque :</b> ' + esc(m.risks.join(' ')) + '</p>' : '') +
-        '<p class="small">' + (m.sources || []).map((s) => '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.label) + '</a>').join(' · ') + ' <span class="muted">· cours du ' + dateFR(c.priceDate) + '</span></p></article>';
+        '<p class="small">' + srcLinks(m) + ' <span class="muted">· cours du ' + dateFR(c.priceDate) + '</span></p></article>';
     };
-    return '<div class="section"><div class="section-head"><h2>Idées mid caps éligibles PEA</h2><div class="filter-row">' + seg('score', 'Score') + seg('up', 'Potentiel') + seg('per', 'PER le plus bas') + '</div></div>' +
+    const stockSection = '<div class="section"><div class="section-head"><h2>Mid caps éligibles PEA</h2><div class="filter-row">' + seg('score', 'Score') + seg('up', 'Potentiel') + seg('per', 'PER le plus bas') + '</div></div>' +
       '<p class="small muted" style="max-width:80ch">Valeurs moyennes françaises non détenues, avec un consensus à l’achat. Score sur 100 = potentiel vs objectif (40 %), force du consensus (30 %), valorisation PER 2026e (20 %), nombre d’analystes (10 %). Consensus au ' + dateFR(researchAsOf()) + '.</p>' +
       (size ? '<div class="banner"><span>Taille conseillée pour une nouvelle ligne : <b>~8 % du PEA, soit environ ' + eur(size, 0) + '</b>. Avec un portefeuille de cette taille, une ou deux nouvelles lignes suffisent ; le reste des versements va au socle ETF Monde.</span></div>' : '') +
       '<div class="grid-3">' + ideas.map(card).join('') + '</div>' +
-      '<div class="grid-2"><div class="card section"><h3>Écartées après analyse</h3><ul class="plain">' + (R.excluded || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div>' +
-      '<div class="card section"><h3>Alternative sans choix de titres</h3><p class="small">Un ETF petites et moyennes capitalisations européennes éligible PEA donne la même exposition en une seule ligne, sans risque spécifique. L’offre est réduite et le plus souvent à réplication synthétique : vérifiez l’ISIN, les frais et le DIC sur BoursoBank avant d’acheter.</p></div></div>' +
-      '<p class="note">Ces idées ne constituent pas un conseil personnalisé. Un objectif d’analyste est une estimation à 12 mois, souvent révisée : le potentiel affiché n’est pas une promesse de rendement.</p></div>';
+      '<div class="card section"><h3>Valeurs écartées après analyse</h3><ul class="plain">' + (R.excluded || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div></div>';
+
+    return '<div class="section"><div class="section-head"><h2>Idées éligibles PEA</h2><div class="filter-row">' + kseg('all', 'Tout') + kseg('etf', 'ETF') + kseg('stocks', 'Mid caps') + '</div></div></div>' +
+      (kind !== 'stocks' ? etfSection : '') + (kind !== 'etf' ? stockSection : '') +
+      '<p class="note">Ces idées ne constituent pas un conseil personnalisé. Un objectif d’analyste est une estimation à 12 mois, souvent révisée : le potentiel affiché n’est pas une promesse de rendement.</p>';
   }
 
   /* ================================================================ Analyse */
@@ -1394,7 +1461,9 @@
       'Seuils de l’investisseur : ligne ' + st.lineWarn + ' / ' + st.lineAlert + ' %, secteur ' + st.sectorWarn + ' / ' + st.sectorAlert + ' %, socle ETF Monde visé ' + st.coreTarget + ' %.',
       'Règle pour le prochain versement : ' + doc.nextMoney,
       '',
-      'Idées mid caps non détenues, consensus à l’achat :\n' + (ideas || '- aucune')
+      'Idées mid caps non détenues, consensus à l’achat :\n' + (ideas || '- aucune'),
+      '',
+      'ETF éligibles PEA suggérés (priorité calculée sur le portefeuille) :\n' + (etfIdeas(A).slice(0, 4).map((m) => '- ' + (m.short || m.name) + ' (' + m.ticker + ') : priorité ' + m.level.toLowerCase() + ', frais ' + nb(m.ter, 2) + ' %, 1 part = ' + eur(m.price)).join('\n') || '- aucun')
     ].join('\n');
   }
 
@@ -1742,6 +1811,7 @@
       }
       if (t.dataset.cfilter) { S.ctrlFilter = t.dataset.cfilter; return renderAll(); }
       if (t.dataset.isort) { S.ideaSort = t.dataset.isort; return renderAll(); }
+      if (t.dataset.ikind) { S.ideaKind = t.dataset.ikind; return renderAll(); }
       if (t.dataset.snapShow) { S.current = t.dataset.snapShow; S.userPicked = true; showTab('synthese'); return renderAll(); }
       if (t.dataset.snapDel) {
         if (t.dataset.armed) {
