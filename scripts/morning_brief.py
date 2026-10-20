@@ -3,22 +3,25 @@
 
 Lit l'export de la base de l'artifact (`--db-dir`, dossier produit par ArtifactData
 `out_dir` : snapshots/, quotes/, alerts/, research/, settings/) et la base de recherche,
-puis compose un message court au format WhatsApp (*gras*).
+puis compose un message court (*gras*).
 
-Envoi WhatsApp (`--send`) par CallMeBot si les variables d'environnement
-CALLMEBOT_PHONE (numéro au format international, ex. +33612345678) et
-CALLMEBOT_APIKEY sont définies dans l'environnement. Sinon le message est seulement
-affiché ; la notification Claude de la routine prend le relais.
+Envoi Telegram (`--send`) par un bot si les variables d'environnement
+TELEGRAM_BOT_TOKEN (jeton donné par @BotFather) et TELEGRAM_CHAT_ID (identifiant de la
+conversation avec le bot) sont définies dans l'environnement. Sinon le message est
+seulement affiché ; la notification Claude de la routine prend le relais.
 
 Usage :
     python3 scripts/morning_brief.py --db-dir <dossier> [--news "ligne" ...] [--send] [--out msg.txt]
 """
 import argparse
 import datetime as dt
+import html
+import json
 import os
 import pathlib
+import re
 import sys
-import urllib.parse
+import urllib.error
 import urllib.request
 import zoneinfo
 
@@ -30,7 +33,7 @@ ARTIFACT_URL = "https://claude.ai/artifact/S5JWYoC7fjJWVPFwLKjNjm"
 DEFAULTS = {"lineWarn": 15, "lineAlert": 25, "sectorWarn": 20, "sectorAlert": 25, "lossAlert": -30,
             "coreTarget": 40, "staleDays": 35}
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-MAX_LEN = 1500  # au-delà, le message est découpé en plusieurs envois
+MAX_LEN = 4000  # limite Telegram : 4 096 caractères ; au-delà, plusieurs envois
 
 
 def fr(x, d=0):
@@ -160,22 +163,37 @@ def split(text: str, limit: int = MAX_LEN) -> list[str]:
     return parts
 
 
-def send_whatsapp(text: str):
-    """True : envoyé ; False : échec d'envoi ; None : WhatsApp non configuré."""
-    phone, key = os.environ.get("CALLMEBOT_PHONE"), os.environ.get("CALLMEBOT_APIKEY")
-    if not phone or not key:
-        print("WhatsApp non configuré (CALLMEBOT_PHONE / CALLMEBOT_APIKEY absents) : message non envoyé.", file=sys.stderr)
+def to_html(text: str) -> str:
+    """*gras* → <b>gras</b>, le reste échappé pour le mode HTML de Telegram."""
+    return re.sub(r"\*([^*\n]+)\*", r"<b>\1</b>", html.escape(text, quote=False))
+
+
+def send_telegram(text: str):
+    """True : envoyé ; False : échec d'envoi ; None : Telegram non configuré."""
+    token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat:
+        print("Telegram non configuré (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID absents) : message non envoyé.", file=sys.stderr)
         return None
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
     ok_all = True
     for i, part in enumerate(split(text), 1):
-        url = "https://api.callmebot.com/whatsapp.php?" + urllib.parse.urlencode({"phone": phone, "text": part, "apikey": key})
+        payload = json.dumps({"chat_id": chat, "text": to_html(part), "parse_mode": "HTML",
+                              "link_preview_options": {"is_disabled": True}}).encode()
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "PEA-Tracker"}), timeout=30) as resp:
-                body = resp.read(400).decode("utf-8", "replace")
-                ok = resp.status == 200 and "error" not in body.lower()
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+        except urllib.error.HTTPError as exc:  # Telegram détaille l'erreur en JSON
+            raw = exc.read()
         except Exception as exc:  # noqa: BLE001
-            body, ok = str(exc), False
-        print(f"WhatsApp partie {i} : {'envoyée' if ok else 'échec'} ({body.replace(key, '***')[:160].strip()})", file=sys.stderr)
+            raw = json.dumps({"description": str(exc)}).encode()
+        try:
+            body = json.loads(raw)
+        except ValueError:
+            body = {"description": raw[:160].decode("utf-8", "replace")}
+        ok = body.get("ok") is True
+        detail = "" if ok else f" ({str(body.get('description', '')).replace(token, '***')[:160]})"
+        print(f"Telegram partie {i} : {'envoyée' if ok else 'échec'}{detail}", file=sys.stderr)
         ok_all = ok_all and ok
     return ok_all
 
@@ -184,14 +202,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Récapitulatif du matin du PEA")
     parser.add_argument("--db-dir", type=pathlib.Path, required=True)
     parser.add_argument("--news", action="append", default=[], help="ligne d'actualité à ajouter (répétable)")
-    parser.add_argument("--send", action="store_true", help="envoyer par WhatsApp si configuré")
+    parser.add_argument("--send", action="store_true", help="envoyer par Telegram si configuré")
     parser.add_argument("--out", type=pathlib.Path, help="écrire le message dans ce fichier")
     args = parser.parse_args()
     text = build(args.db_dir, args.news)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
     print(text)
-    if args.send and send_whatsapp(text) is False:
+    if args.send and send_telegram(text) is False:
         sys.exit(2)  # configuré mais en échec ; non configuré = sortie normale
 
 

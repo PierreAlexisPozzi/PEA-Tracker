@@ -69,7 +69,7 @@ Dans la page, la valorisation affichée devient « au cours du jour » : quantit
 relevé importé, cours de la routine. Importer un nouveau relevé reste nécessaire après un
 achat ou une vente. La procédure est décrite dans `.claude/skills/maj-quotidienne-pea`.
 
-### Récapitulatif du matin (WhatsApp)
+### Récapitulatif du matin (Telegram)
 
 Une seconde routine tourne chaque jour ouvré à 8 h 10. Elle compose un message court :
 
@@ -78,9 +78,18 @@ Une seconde routine tourne chaque jour ouvré à 8 h 10. Elle compose un message
 - actions à faire et points à surveiller ;
 - publications de la semaine et actualités de la nuit.
 
-Le message part par WhatsApp via [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/)
-quand `CALLMEBOT_PHONE` et `CALLMEBOT_APIKEY` sont définis dans les secrets de
-l'environnement cloud. Sinon, il arrive par la notification de la routine.
+Le message part par un bot Telegram quand `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont
+définis dans les variables de l'environnement cloud. Sinon, il arrive par la notification
+de la routine. Pour créer le bot :
+
+1. Dans Telegram, écrire à **@BotFather**, envoyer `/newbot`, choisir un nom : il renvoie
+   le jeton du bot (`TELEGRAM_BOT_TOKEN`).
+2. Ouvrir la conversation avec le nouveau bot et lui envoyer `/start`.
+3. Dans un navigateur, ouvrir `https://api.telegram.org/bot<jeton>/getUpdates` : le nombre
+   qui suit `"chat":{"id":` est `TELEGRAM_CHAT_ID`.
+
+Le bot n'écrit qu'à cette conversation. Le jeton est un secret : le garder hors du dépôt
+et des conversations.
 
 ```bash
 python3 scripts/morning_brief.py --db-dir <dossier> [--news "Valeur : fait"] [--send]

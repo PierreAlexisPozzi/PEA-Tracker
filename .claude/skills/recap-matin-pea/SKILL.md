@@ -1,6 +1,6 @@
 ---
 name: recap-matin-pea
-description: Récapitulatif du matin du PEA Tracker (jours ouvrés, 8 h 10) — positions, actions à faire, points à surveiller et actualités de la nuit, envoyé par WhatsApp si configuré, sinon par la notification de la routine. À utiliser quand une routine ou l'utilisateur demande le récap du matin, le point du matin ou le message WhatsApp du PEA.
+description: Récapitulatif du matin du PEA Tracker (jours ouvrés, 8 h 10) — positions, actions à faire, points à surveiller et actualités de la nuit, envoyé par Telegram si configuré, sinon par la notification de la routine. À utiliser quand une routine ou l'utilisateur demande le récap du matin, le point du matin ou le message Telegram du PEA.
 ---
 
 # Récapitulatif du matin du PEA
@@ -37,16 +37,17 @@ python3 scripts/morning_brief.py --db-dir <scratchpad>/db --send --out <scratchp
   --news "Valeur : fait" --news "…"
 ```
 
-- Le script compose le message et l'envoie par WhatsApp si `CALLMEBOT_PHONE` et
-  `CALLMEBOT_APIKEY` sont définis dans l'environnement.
+- Le script compose le message et l'envoie par le bot Telegram si `TELEGRAM_BOT_TOKEN` et
+  `TELEGRAM_CHAT_ID` sont définis dans l'environnement.
 - Ne jamais afficher ni recopier ces valeurs.
-- Code de sortie 2 : WhatsApp est configuré mais l'envoi a échoué. Le signaler dans le
-  message final.
+- Code de sortie 2 : Telegram est configuré mais l'envoi a échoué. Le signaler dans le
+  message final avec la raison affichée par le script (jeton refusé, conversation
+  introuvable…).
 
 ## 4. Message final
 
 C'est le texte de la notification de la routine :
-- WhatsApp envoyé : une ligne, « Récap envoyé sur WhatsApp », suivie de la valeur et du
+- Telegram envoyé : une ligne, « Récap envoyé sur Telegram », suivie de la valeur et du
   nombre d'actions à faire.
 - Sinon : le contenu de `recap.txt` tel quel.
 
