@@ -32,11 +32,11 @@ les alertes.
 |---|---|
 | Synthèse | Zone « Mettre à jour mon relevé », dernière analyse, valeur, +/- value (avec et sans titres radiés), indice de santé, actions prioritaires, répartition, performance par ligne, avis des analystes |
 | Analyse | Rapport créé à chaque import ou à la demande : ce qui a changé, plan d'action, prochain versement, commentaire ligne par ligne, commentaire rédigé par Claude ; historique des analyses |
-| Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne |
+| Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne. Un bouton masque ou affiche les valeurs plus suivies (titres radiés), aussi dans la Synthèse et l'Analyse ; elles restent comptées dans les totaux |
 | Contrôles | 22 contrôles en vert / orange / rouge : qualité du relevé, concentration, pertes, titres radiés, socle diversifié, doublons titres/ETF, analystes, cadre PEA |
 | Alertes | Seuils sur le cours, la +/- value, le poids, la variation du jour, le potentiel, un secteur ou le portefeuille ; alertes recommandées en un clic |
 | Flux | Chaîne de traitement d'un relevé, évolution de la valeur, plafond des versements (150 000 €), journal des mouvements, relevés enregistrés |
-| Idées mid caps | Valeurs moyennes non détenues avec consensus à l'achat, classées par un score sur 100 |
+| Idées | ETF éligibles PEA avec une priorité calculée sur le portefeuille (zones, secteurs, doublons, prix de la part), et mid caps non détenues classées par un score sur 100 |
 
 ### Analyses
 
@@ -68,6 +68,32 @@ clôture d'Euronext. Elle :
 Dans la page, la valorisation affichée devient « au cours du jour » : quantités du dernier
 relevé importé, cours de la routine. Importer un nouveau relevé reste nécessaire après un
 achat ou une vente. La procédure est décrite dans `.claude/skills/maj-quotidienne-pea`.
+
+### Récapitulatif du matin (Telegram)
+
+Une seconde routine tourne chaque jour ouvré à 8 h 10. Elle compose un message court :
+
+- valeur, variation de la séance, meilleure et pire ligne ;
+- actions à faire, puis points à surveiller (alertes, publications de la semaine) ;
+- actualités de la nuit ;
+- positions (poids, séance, +/- latente), dans un bloc repliable.
+
+Le message part par un bot Telegram quand `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont
+définis dans les variables de l'environnement cloud. Sinon, il arrive par la notification
+de la routine. Pour créer le bot :
+
+1. Dans Telegram, écrire à **@BotFather**, envoyer `/newbot`, choisir un nom : il renvoie
+   le jeton du bot (`TELEGRAM_BOT_TOKEN`).
+2. Ouvrir la conversation avec le nouveau bot et lui envoyer `/start`.
+3. Dans un navigateur, ouvrir `https://api.telegram.org/bot<jeton>/getUpdates` : le nombre
+   qui suit `"chat":{"id":` est `TELEGRAM_CHAT_ID`.
+
+Le bot n'écrit qu'à cette conversation. Le jeton est un secret : le garder hors du dépôt
+et des conversations.
+
+```bash
+python3 scripts/morning_brief.py --db-dir <dossier> [--news "Valeur : fait"] [--send]
+```
 
 ### Lecture du consensus
 

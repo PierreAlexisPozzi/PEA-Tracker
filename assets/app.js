@@ -70,6 +70,8 @@
     posSort: { key: 'value', dir: -1 },
     ctrlFilter: 'all',
     ideaSort: 'score',
+    ideaKind: 'all',
+    showUnfollowed: (() => { try { return localStorage.getItem(LS_KEY + ':showUnfollowed') !== '0'; } catch (e) { return true; } })(),
     readOnly: false,
     awaitId: null,
     pending: null,
@@ -966,6 +968,28 @@
       (s.stale.length ? ' Cours non mis à jour : ' + esc(s.stale.join(', ')) + '.' : '') + '</span></div>';
   }
 
+  /* ---------------- Filtre des valeurs plus suivies (titres radiés ou non négociables) */
+
+  const isUnfollowed = (isin) => !!(inst(isin) || {}).nonTradable;
+  const showUnfollowed = () => S.showUnfollowed !== false;
+  function visible(lines) { return showUnfollowed() ? lines : lines.filter((l) => !isUnfollowed(l.isin)); }
+
+  function unfollowedToggle(lines) {
+    const n = lines.filter((l) => isUnfollowed(l.isin)).length;
+    if (!n) return '';
+    const shown = showUnfollowed();
+    return '<button class="seg" type="button" data-act="toggle-unfollowed" aria-pressed="' + !shown + '">' + (shown ? 'Masquer' : 'Afficher') + ' les valeurs plus suivies (' + n + ')</button>';
+  }
+
+  function unfollowedNote(lines) {
+    if (showUnfollowed()) return '';
+    const hid = lines.filter((l) => isUnfollowed(l.isin));
+    if (!hid.length) return '';
+    const pl = hid.length > 1;
+    return '<p class="small muted">' + hid.length + ' valeur' + (pl ? 's' : '') + ' plus suivie' + (pl ? 's' : '') + ' masquée' + (pl ? 's' : '') + ' : ' +
+      esc(hid.map((l) => l.label + (ok(l.value) ? ' (' + eur(l.value) + ')' : '')).join(', ')) + '. ' + (pl ? 'Elles restent comptées' : 'Elle reste comptée') + ' dans les totaux et les contrôles.</p>';
+  }
+
   function demoBanner() {
     return S.demo ? '<div class="banner"><span><b>Exemple fictif.</b> Ces positions ne sont pas les vôtres.</span><button class="btn sm" type="button" data-act="exit-demo">Quitter l’exemple</button></div>' : '';
   }
@@ -996,7 +1020,7 @@
     const nW = C.filter((c) => c.status === 'warn').length;
     const nO = C.filter((c) => c.status === 'ok').length;
     const todo = C.filter((c) => (c.status === 'alert' || c.status === 'warn') && c.action).sort((a, b) => (a.status === 'alert' ? 0 : 1) - (b.status === 'alert' ? 0 : 1)).slice(0, 5);
-    const lines = A.lines.slice().sort((a, b) => b.value - a.value);
+    const lines = visible(A.lines).slice().sort((a, b) => b.value - a.value);
     const kpi = '<div class="kpis">' +
       '<div class="kpi"><span class="label">Valeur du PEA</span><span class="value hero num">' + eur(A.total, 0) + '</span><span class="sub">' + (A.cash ? 'dont ' + eur(A.cash, 0) + ' de liquidités' : 'hors liquidités (non incluses dans l’export)') + '</span></div>' +
       '<div class="kpi"><span class="label">+/- value latente</span><span class="value num ' + tone(A.pnl) + '">' + sEur(A.pnl, 0) + '</span><span class="sub num">' + sPct(A.pnlPct) + ' sur ' + eur(A.cost, 0) + ' investis</span></div>' +
@@ -1021,9 +1045,10 @@
       '<p class="small muted">En orange : au-dessus du seuil d’alerte sectoriel (' + S.settings.sectorAlert + ' %).</p></div>';
 
     const pnl = '<div class="card section"><div class="section-head"><h2>Performance par ligne</h2><div class="legend"><span><i style="background:var(--gain)"></i>Plus-value</span><span><i style="background:var(--loss)"></i>Moins-value</span></div></div>' +
-      dbars(A.lines.slice().sort((a, b) => b.pnlPct - a.pnlPct).map((l) => ({ label: l.label, value: l.pnlPct, tip: '<b>' + esc(l.label) + '</b><br>' + sPct(l.pnlPct) + ' · ' + sEur(l.pnl) + '<br>PRU ' + eur(l.pru) + ' → cours ' + eur(l.last) }))) + '</div>';
+      (unfollowedToggle(A.lines) ? '<div class="filter-row">' + unfollowedToggle(A.lines) + '</div>' : '') +
+      dbars(visible(A.lines).slice().sort((a, b) => b.pnlPct - a.pnlPct).map((l) => ({ label: l.label, value: l.pnlPct, tip: '<b>' + esc(l.label) + '</b><br>' + sPct(l.pnlPct) + ' · ' + sEur(l.pnl) + '<br>PRU ' + eur(l.pru) + ' → cours ' + eur(l.last) }))) + unfollowedNote(A.lines) + '</div>';
 
-    const analysts = '<div class="section"><div class="section-head"><h2>Ce que disent les analystes sur vos lignes</h2>' + ABAR_LEGEND + '</div>' +
+    const analysts = '<div class="section"><div class="section-head"><h2>Ce que disent les analystes sur vos lignes</h2>' + ABAR_LEGEND + unfollowedToggle(A.lines) + '</div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th>Avis des analystes</th><th>Répartition</th><th class="r">Objectif</th><th class="r">Potentiel</th><th>Avis de synthèse</th></tr></thead><tbody>' +
       lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><div class="name-cell"><b>' + esc(l.label) + '</b><span>' + esc(l.m.sector || '') + '</span></div></td>' +
         '<td>' + (l.call ? recoPill(l.call.label, l.call.cls) + ' <span class="small muted">' + esc(l.call.strength) + (l.call.thin ? ', ' + l.call.n + ' analyste' + (l.call.n > 1 ? 's' : '') : '') + '</span>' : '<span class="small muted">' + (l.m.kind === 'etf' ? 'ETF : pas de consensus' : l.m.nonTradable ? 'Plus suivie' : 'Non couvert') + '</span>') + '</td>' +
@@ -1031,7 +1056,7 @@
         '<td class="r">' + (l.m.consensus && !l.m.nonTradable ? eur(l.m.consensus.target) : '—') + '</td>' +
         '<td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
-      '</tbody></table></div><p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
+      '</tbody></table></div>' + unfollowedNote(A.lines) + '<p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
 
     return demoBanner() + updateCard() + quotesBanner(A) + analysisTeaser() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
   }
@@ -1043,10 +1068,10 @@
     const k = S.posSort.key;
     const d = S.posSort.dir;
     const val = (l) => ({ label: l.label, qty: l.qty, pru: l.pru, last: l.last, dayVar: l.dayVar, value: l.value, weight: l.weight, pnl: l.pnl, pnlPct: l.pnlPct, upside: l.upside == null ? -Infinity : l.upside })[k];
-    const lines = A.lines.slice().sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; });
+    const lines = visible(A.lines).slice().sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; });
     const th = (key, label, r) => '<th class="' + (r ? 'r' : '') + '" aria-sort="' + (k === key ? (d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + key + '">' + label + (k === key ? (d > 0 ? ' ↑' : ' ↓') : '') + '</button></th>';
     const maxW = Math.max(S.settings.lineAlert, Math.max.apply(null, A.lines.map((l) => l.weight)));
-    return demoBanner() + quotesBanner(A) + '<div class="section"><div class="section-head"><h2>Positions</h2><span class="muted small">Cliquez sur une ligne pour sa fiche.</span></div>' +
+    return demoBanner() + quotesBanner(A) + '<div class="section"><div class="section-head"><h2>Positions</h2><div class="actions"><span class="muted small">Cliquez sur une ligne pour sa fiche.</span>' + unfollowedToggle(A.lines) + '</div></div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + th('label', 'Ligne') + th('qty', 'Qté', 1) + th('pru', 'PRU', 1) + th('last', 'Cours', 1) + th('dayVar', 'Jour', 1) + th('value', 'Valeur', 1) + th('weight', 'Poids') + th('pnl', '+/- value', 1) + th('pnlPct', '%', 1) + '<th>Analystes</th>' + th('upside', 'Potentiel', 1) + '<th>Avis</th></tr></thead><tbody>' +
       lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '">' +
         '<td><div class="name-cell"><b>' + esc(l.label) + '</b><span>' + esc(l.isin) + ' · ' + esc(l.m.kind === 'etf' ? 'ETF' : (l.m.market || 'Action')) + '</span></div></td>' +
@@ -1057,7 +1082,7 @@
         '<td>' + (l.call ? recoPill(l.call.label, l.call.cls) : '<span class="small muted">—</span>') + '</td>' +
         '<td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
-      '</tbody><tfoot><tr><td>Total' + (A.cash ? ' (dont liquidités ' + eur(A.cash, 0) + ')' : '') + '</td><td></td><td></td><td></td><td class="r ' + tone(A.day) + '">' + sEur(A.day) + '</td><td class="r">' + eur(A.total) + '</td><td>100 %</td><td class="r ' + tone(A.pnl) + '">' + sEur(A.pnl) + '</td><td class="r ' + tone(A.pnlPct) + '">' + sPct(A.pnlPct) + '</td><td></td><td></td><td></td></tr></tfoot></table></div>' +
+      '</tbody><tfoot><tr><td>Total' + (A.cash ? ' (dont liquidités ' + eur(A.cash, 0) + ')' : '') + '</td><td></td><td></td><td></td><td class="r ' + tone(A.day) + '">' + sEur(A.day) + '</td><td class="r">' + eur(A.total) + '</td><td>100 %</td><td class="r ' + tone(A.pnl) + '">' + sEur(A.pnl) + '</td><td class="r ' + tone(A.pnlPct) + '">' + sPct(A.pnlPct) + '</td><td></td><td></td><td></td></tr></tfoot></table></div>' + unfollowedNote(A.lines) +
       '<p class="note">Potentiel = objectif moyen des analystes ÷ cours du relevé − 1. Barre orange : ligne au-dessus du seuil de vigilance (' + S.settings.lineWarn + ' %, ETF diversifiés exclus).</p></div>';
   }
 
@@ -1199,7 +1224,71 @@
 
   /* ---------------- Idées */
 
+  /**
+   * Idées d'ETF éligibles PEA. La priorité est calculée sur le portefeuille affiché :
+   * ce que l'ETF ajoute (hors Europe, défensif, small caps, frais bas) moins ce qu'il
+   * recoupe (ETF Monde, secteur déjà lourd) et une part trop chère pour la taille du PEA.
+   */
+  function etfIdeas(A) {
+    const st = S.settings;
+    const held = new Set(A ? A.lines.map((l) => l.isin) : []);
+    const q = S.quotes[S.quotes.length - 1];
+    const sectorW = (name) => A ? sum(A.lines.filter((l) => l.m.sector === name), (l) => l.weight) : 0;
+    const eu = A ? (A.zones.find((z) => z.name === 'Europe') || { weight: 0 }).weight : 100;
+    const outside = 100 - eu;
+    const core = sectorW('Monde diversifié');
+    const cyc = A ? sum(A.lines.filter((l) => /Énergie|Industrie|Technologie/.test(l.m.sector || '')), (l) => l.weight) : 0;
+    return allIsins().map((i) => Object.assign({ isin: i }, inst(i))).filter((m) => m.etfIdea && !held.has(m.isin)).map((m) => {
+      const qp = q && q.prices && q.prices[m.isin];
+      const price = qp && ok(qp.last) ? qp.last : m.price;
+      const priceDate = qp && ok(qp.last) ? q.date : m.priceDate;
+      const ticket = A && A.total && ok(price) ? price / A.total * 100 : null;
+      const plus = [];
+      const minus = [];
+      let pts = 0;
+      const outsideShare = 1 - ((m.zones || {}).Europe || 0);
+      if (A && outsideShare > 0.5) {
+        if (outside < st.outsideEuropeMin) { pts += 2; plus.push('Augmente ton exposition hors Europe (' + pct(outside) + ' aujourd’hui, minimum conseillé ' + st.outsideEuropeMin + ' %).'); }
+        else { pts += 1; plus.push('Diversifie hors Europe.'); }
+      }
+      if (m.overlapCore && core > 0) { pts -= 2; minus.push('Recoupe ton ETF Monde : environ ' + m.overlapCore + ' % de son contenu y est déjà.'); }
+      if (m.overlapSector && sectorW(m.overlapSector) >= 10) { pts -= 1; minus.push('Tu as déjà ' + pct(sectorW(m.overlapSector)) + ' du PEA en ' + m.overlapSector.toLowerCase() + '.'); }
+      if (m.defensive && cyc >= 40) { pts += 1; plus.push('Secteur défensif face à ' + pct(cyc) + ' d’énergie, d’industrie et de tech dans ton PEA.'); }
+      if (m.smallcaps) { pts += 1; plus.push('Petites et moyennes valeurs sans choisir de titres.'); }
+      if (ok(m.ter) && m.ter <= 0.2) { pts += 1; plus.push('Frais bas (' + nb(m.ter, 2) + ' % par an).'); }
+      if (ok(m.aum) && m.aum < 300) minus.push('Encours modeste (' + nb(m.aum, 0) + ' M€).');
+      if (ok(ticket) && ticket > 12) { pts -= 2; minus.push('Une part coûte ' + eur(price, 0) + ', soit ' + pct(ticket) + ' du PEA : trop lourd aujourd’hui.'); }
+      const level = pts >= 2 ? 'Haute' : pts >= 1 ? 'Moyenne' : 'Faible';
+      return Object.assign(m, { price, priceDate, ticket, pts, level, plus, minus });
+    }).sort((a, b) => b.pts - a.pts || (a.ter || 0) - (b.ter || 0));
+  }
+
   function renderIdees(A) {
+    const kind = S.ideaKind || 'all';
+    const kseg = (k, label) => '<button class="seg" type="button" data-ikind="' + k + '" aria-pressed="' + (kind === k) + '">' + label + '</button>';
+    const srcLinks = (m) => (m.sources || []).map((x) => '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.label) + '</a>').join(' · ');
+
+    // ETF
+    const etfs = etfIdeas(A);
+    const core = A ? sum(A.lines.filter((l) => l.m.sector === 'Monde diversifié'), (l) => l.weight) : null;
+    const levelCls = { Haute: 'buy', Moyenne: 'hold', Faible: 'none' };
+    const etfCard = (m) => '<article class="card idea"><div class="idea-head"><div><span class="eyebrow">' + esc(m.ticker) + ' · ' + esc(m.isin) + '</span><h3>' + esc(m.short || m.name) + '</h3><p class="small muted">' + esc(m.name) + '</p></div>' +
+      '<div class="score"><span class="reco r-' + levelCls[m.level] + '">Priorité ' + m.level.toLowerCase() + '</span></div></div>' +
+      '<p class="small">' + esc(m.role) + '</p>' +
+      '<div class="facts"><div><span>Frais</span><b>' + (ok(m.ter) ? nb(m.ter, 2) + ' %' : '—') + '</b></div><div><span>Encours</span><b>' + (ok(m.aum) ? nb(m.aum, 0) + ' M€' : '—') + '</b></div><div><span>1 part</span><b>' + eur(m.price) + '</b></div>' +
+      '<div><span>Perf. 1 an</span><b class="' + tone(m.perf1y) + '">' + sPct(m.perf1y, 0) + '</b></div><div><span>Réplication</span><b>' + esc(String(m.replication || '—').split(' ')[0]) + '</b></div><div><span>1 part / PEA</span><b>' + (ok(m.ticket) ? pct(m.ticket) : '—') + '</b></div></div>' +
+      (m.plus.length ? '<ul class="plain">' + m.plus.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+      (m.minus.length ? '<p class="small muted"><b>À savoir :</b> ' + esc(m.minus.join(' ')) + '</p>' : '') +
+      (m.risks && m.risks.length ? '<p class="small muted"><b>Risque :</b> ' + esc(m.risks.join(' ')) + '</p>' : '') +
+      '<p class="small">' + srcLinks(m) + ' <span class="muted">· indice ' + esc(m.index || '') + ' · cours du ' + dateFR(m.priceDate) + '</span></p></article>';
+    const etfSection = '<div class="section"><div class="section-head"><h2>ETF éligibles PEA</h2><span class="small muted">Priorité calculée sur ton portefeuille</span></div>' +
+      (A && ok(core) && core < S.settings.coreTarget ? '<div class="banner"><span><b>Priorité n°1 : ton ETF Monde</b> (' + pct(core) + ' du PEA pour une cible de ' + S.settings.coreTarget + ' %). Les ETF ci-dessous sont des compléments, à 5–10 % du PEA chacun.</span></div>' : '') +
+      '<div class="grid-3">' + etfs.map(etfCard).join('') + '</div>' +
+      '<div class="grid-2"><div class="card section"><h3>ETF écartés</h3><ul class="plain">' + (R.excludedEtfs || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div>' +
+      '<div class="card section"><h3>Lecture de la priorité</h3><ul class="plain"><li>Haute : comble un manque du portefeuille (zone, secteur) à frais raisonnables.</li><li>Moyenne : utile, mais recoupe en partie ce que tu détiens.</li><li>Faible : doublon important ou part trop chère pour la taille du PEA.</li></ul>' +
+      '<p class="small muted">Performance sur 1 an indicative (variation du cours) ; elle ne préjuge pas de l’avenir. Vérifie l’éligibilité PEA et le DIC sur BoursoBank avant d’acheter.</p></div></div></div>';
+
+    // Mid caps
     const ideas = rankedIdeas(A);
     const key = S.ideaSort;
     ideas.sort((a, b) => key === 'up' ? b.sc.up - a.sc.up : key === 'per' ? (a.per ? a.per[0] : 99) - (b.per ? b.per[0] : 99) : b.sc.score - a.sc.score);
@@ -1217,15 +1306,17 @@
         '<div><span>PER 2026e</span><b>' + (m.per ? nb(m.per[0], 1) : '—') + '</b></div><div><span>PER 2027e</span><b>' + (m.per ? nb(m.per[1], 1) : '—') + '</b></div><div><span>Rendement</span><b>' + (ok(m.yield) ? pct(m.yield) : '—') + '</b></div></div>' +
         (ok(ticket) ? '<p class="small"><b>Ticket minimum :</b> 1 titre = ' + pct(ticket) + ' du PEA' + (ticket > 12 ? ' (trop lourd pour une seule ligne aujourd’hui)' : '') + '.</p>' : '') +
         '<p class="small">' + esc(m.thesis) + '</p>' + (m.risks && m.risks.length ? '<p class="small muted"><b>Risque :</b> ' + esc(m.risks.join(' ')) + '</p>' : '') +
-        '<p class="small">' + (m.sources || []).map((s) => '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.label) + '</a>').join(' · ') + ' <span class="muted">· cours du ' + dateFR(c.priceDate) + '</span></p></article>';
+        '<p class="small">' + srcLinks(m) + ' <span class="muted">· cours du ' + dateFR(c.priceDate) + '</span></p></article>';
     };
-    return '<div class="section"><div class="section-head"><h2>Idées mid caps éligibles PEA</h2><div class="filter-row">' + seg('score', 'Score') + seg('up', 'Potentiel') + seg('per', 'PER le plus bas') + '</div></div>' +
+    const stockSection = '<div class="section"><div class="section-head"><h2>Mid caps éligibles PEA</h2><div class="filter-row">' + seg('score', 'Score') + seg('up', 'Potentiel') + seg('per', 'PER le plus bas') + '</div></div>' +
       '<p class="small muted" style="max-width:80ch">Valeurs moyennes françaises non détenues, avec un consensus à l’achat. Score sur 100 = potentiel vs objectif (40 %), force du consensus (30 %), valorisation PER 2026e (20 %), nombre d’analystes (10 %). Consensus au ' + dateFR(researchAsOf()) + '.</p>' +
       (size ? '<div class="banner"><span>Taille conseillée pour une nouvelle ligne : <b>~8 % du PEA, soit environ ' + eur(size, 0) + '</b>. Avec un portefeuille de cette taille, une ou deux nouvelles lignes suffisent ; le reste des versements va au socle ETF Monde.</span></div>' : '') +
       '<div class="grid-3">' + ideas.map(card).join('') + '</div>' +
-      '<div class="grid-2"><div class="card section"><h3>Écartées après analyse</h3><ul class="plain">' + (R.excluded || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div>' +
-      '<div class="card section"><h3>Alternative sans choix de titres</h3><p class="small">Un ETF petites et moyennes capitalisations européennes éligible PEA donne la même exposition en une seule ligne, sans risque spécifique. L’offre est réduite et le plus souvent à réplication synthétique : vérifiez l’ISIN, les frais et le DIC sur BoursoBank avant d’acheter.</p></div></div>' +
-      '<p class="note">Ces idées ne constituent pas un conseil personnalisé. Un objectif d’analyste est une estimation à 12 mois, souvent révisée : le potentiel affiché n’est pas une promesse de rendement.</p></div>';
+      '<div class="card section"><h3>Valeurs écartées après analyse</h3><ul class="plain">' + (R.excluded || []).map((e) => '<li><b>' + esc(e.name) + '</b> : ' + esc(e.reason) + '</li>').join('') + '</ul></div></div>';
+
+    return '<div class="section"><div class="section-head"><h2>Idées éligibles PEA</h2><div class="filter-row">' + kseg('all', 'Tout') + kseg('etf', 'ETF') + kseg('stocks', 'Mid caps') + '</div></div></div>' +
+      (kind !== 'stocks' ? etfSection : '') + (kind !== 'etf' ? stockSection : '') +
+      '<p class="note">Ces idées ne constituent pas un conseil personnalisé. Un objectif d’analyste est une estimation à 12 mois, souvent révisée : le potentiel affiché n’est pas une promesse de rendement.</p>';
   }
 
   /* ================================================================ Analyse */
@@ -1394,7 +1485,9 @@
       'Seuils de l’investisseur : ligne ' + st.lineWarn + ' / ' + st.lineAlert + ' %, secteur ' + st.sectorWarn + ' / ' + st.sectorAlert + ' %, socle ETF Monde visé ' + st.coreTarget + ' %.',
       'Règle pour le prochain versement : ' + doc.nextMoney,
       '',
-      'Idées mid caps non détenues, consensus à l’achat :\n' + (ideas || '- aucune')
+      'Idées mid caps non détenues, consensus à l’achat :\n' + (ideas || '- aucune'),
+      '',
+      'ETF éligibles PEA suggérés (priorité calculée sur le portefeuille) :\n' + (etfIdeas(A).slice(0, 4).map((m) => '- ' + (m.short || m.name) + ' (' + m.ticker + ') : priorité ' + m.level.toLowerCase() + ', frais ' + nb(m.ter, 2) + ' %, 1 part = ' + eur(m.price)).join('\n') || '- aucun')
     ].join('\n');
   }
 
@@ -1530,11 +1623,11 @@
       '<div class="card section"><h2>Plan d’action</h2>' + (view.actions.length ? '<ol class="plain">' + view.actions.map((a) => '<li>' + lvl(a.level) + ' <b>' + esc(a.title) + '</b> : ' + esc(a.text) + '</li>').join('') + '</ol>' : '<p class="muted">Rien d’urgent : vos seuils sont respectés.</p>') +
       '<p class="small"><b>Prochain versement :</b> ' + esc(view.nextMoney) + '</p></div></div>' +
       '<div class="card section" id="claudeBox" aria-live="polite">' + claudeInner(view) + '</div>' +
-      '<div class="section"><h2>Ligne par ligne</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th class="r">Poids</th><th class="r">+/- %</th><th>Analystes</th><th class="r">Potentiel</th><th>Avis</th><th>Commentaire</th></tr></thead><tbody>' +
-      view.lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><b>' + esc(l.label) + '</b></td><td class="r">' + pct(l.weight) + '</td><td class="r ' + tone(l.pnlPct) + '">' + sPct(l.pnlPct) + '</td>' +
+      '<div class="section"><div class="section-head"><h2>Ligne par ligne</h2>' + unfollowedToggle(view.lines) + '</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th class="r">Poids</th><th class="r">+/- %</th><th>Analystes</th><th class="r">Potentiel</th><th>Avis</th><th>Commentaire</th></tr></thead><tbody>' +
+      visible(view.lines).map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><b>' + esc(l.label) + '</b></td><td class="r">' + pct(l.weight) + '</td><td class="r ' + tone(l.pnlPct) + '">' + sPct(l.pnlPct) + '</td>' +
         '<td>' + (l.analysts ? recoPill(l.analysts) + ' <span class="small muted">' + l.analystsN + '</span>' : '<span class="small muted">—</span>') + '</td><td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.view ? recoPill(l.view) : '<span class="reco r-none">À étudier</span>') + '</td><td class="small">' + esc(l.note) + '</td></tr>').join('') +
-      '</tbody></table></div></div>' +
+      '</tbody></table></div>' + unfollowedNote(view.lines) + '</div>' +
       '<p class="note">Une analyse est créée automatiquement à chaque import (et Claude rédige un commentaire si l’option est active dans Réglages). « Nouvelle analyse » en refait une à tout moment. Pour une analyse avec consensus rafraîchis sur le web, demandez-la à Claude dans une conversation.</p>';
   }
 
@@ -1742,6 +1835,7 @@
       }
       if (t.dataset.cfilter) { S.ctrlFilter = t.dataset.cfilter; return renderAll(); }
       if (t.dataset.isort) { S.ideaSort = t.dataset.isort; return renderAll(); }
+      if (t.dataset.ikind) { S.ideaKind = t.dataset.ikind; return renderAll(); }
       if (t.dataset.snapShow) { S.current = t.dataset.snapShow; S.userPicked = true; showTab('synthese'); return renderAll(); }
       if (t.dataset.snapDel) {
         if (t.dataset.armed) {
@@ -1780,6 +1874,16 @@
         case 'parse-paste': return handlePaste();
         case 'commit': return commitImport();
         case 'close': return closeSheet();
+        case 'toggle-unfollowed': {
+          S.showUnfollowed = !showUnfollowed();
+          try { localStorage.setItem(LS_KEY + ':showUnfollowed', S.showUnfollowed ? '1' : '0'); } catch (err) { /* préférence non mémorisée */ }
+          const idx = Array.from(document.querySelectorAll('#panel-' + S.tab + ' [data-act="toggle-unfollowed"]')).indexOf(t);
+          renderAll();
+          const again = document.querySelectorAll('#panel-' + S.tab + ' [data-act="toggle-unfollowed"]')[Math.max(0, idx)];
+          if (again) again.focus();
+          toast(S.showUnfollowed ? 'Valeurs plus suivies affichées.' : 'Valeurs plus suivies masquées (toujours comptées dans les totaux).');
+          return;
+        }
         case 'demo': S.demo = demoSnapshot(); return renderAll();
         case 'exit-demo': S.demo = null; return renderAll();
         case 'reset-settings': {

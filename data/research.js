@@ -10,13 +10,14 @@
  *
  * Mise à jour : modifier `asOf`, puis les blocs `consensus` concernés.
  * `yahoo` : symbole utilisé par scripts/daily_update.py pour le cours du jour.
+ * `events` : publications à venir ({ date, label }), reprises par le récapitulatif du matin.
  * Les mises à jour quotidiennes de la routine sont écrites dans la base de
  * l'artifact (collection `research`) et priment sur ce fichier.
  */
 window.PEA_RESEARCH = {
   version: 1,
-  asOf: '2026-10-03',
-  source: 'Consensus FactSet affiché par Boursorama (consulté le 03/10/2026), Zonebourse, communiqués des sociétés.',
+  asOf: '2026-10-18',
+  source: 'Consensus FactSet affiché par Boursorama (consulté le 18/10/2026, cours du 16/10), Zonebourse, communiqués des sociétés.',
 
   instruments: {
     /* ------------------------------------------------------------ ETF */
@@ -62,26 +63,26 @@ window.PEA_RESEARCH = {
     'FR0000120271': {
       yahoo: 'TTE.PA', name: 'TotalEnergies', ticker: 'TTE', kind: 'action', sector: 'Énergie', cap: 'Large cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 },
-      consensus: { buy: 13, outperform: 1, hold: 7, underperform: 2, sell: 0, median: 1.91, target: 82.60, price: 74.46, priceDate: '2026-10-03' },
-      view: { label: 'Conserver', why: "Consensus positif (14 avis positifs sur 23) et rendement estimé ~4,8 %. Mais l'objectif moyen ne laisse que ~11 % de potentiel et la valeur fait doublon avec l'ETF Énergie." },
-      facts: ['Objectif médian 82,60 € (23 analystes : 13 Acheter, 1 Renforcer, 7 Conserver, 2 Alléger).', 'PER 2026e ~8, dividende 2026e ~3,60 €/action.'],
+      consensus: { buy: 13, outperform: 1, hold: 8, underperform: 2, sell: 0, median: 1.96, target: 89.19, price: 80.71, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Consensus positif (14 avis positifs sur 24) et objectif médian relevé à 89,19 €, soit ~10 % de potentiel. Le cours a déjà pris ~8 % depuis le relevé et la valeur fait doublon avec l'ETF Énergie : ne pas renforcer." },
+      facts: ['Objectif médian relevé de 82,60 € à 89,19 € (24 analystes : 13 Acheter, 1 Renforcer, 8 Conserver, 2 Alléger).', 'UBS relève son objectif à 88 € (Achat, 21/09/2026) ; Oddo BHF vise aussi 88 €.', 'PER 2026e ~8, dividende 2026e ~3,60 €/action.'],
       risks: ['Prix du pétrole et du gaz ; fiscalité exceptionnelle sur les énergéticiens.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPTTE/' }]
     },
     'FR0000066672': {
       yahoo: 'GLO.PA', name: 'GL Events', ticker: 'GLO', kind: 'action', sector: 'Événementiel', cap: 'Small cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 },
-      consensus: { buy: 6, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 38.77, price: 24.20, priceDate: '2026-10-03' },
-      view: { label: 'Conserver', why: "6 analystes sur 6 à l'achat et ~60 % de potentiel. Les résultats du 1er semestre sont solides, malgré la baisse du titre. Renforcement possible, en limitant la ligne à ~8 % du portefeuille." },
-      facts: ['S1 2026 : CA 966 M€ (+9 %), RN part du groupe 55 M€ (+6 %), objectifs annuels confirmés.', 'Fait partie des 8 convictions de Portzamparc pour le S2 2026 (objectif 38 €).', '02/10/2026 : obtention de la concession du Lima Convention Center (Pérou).'],
-      risks: ['Activité dépendante des grands événements ; endettement lié aux sites (Venues).', 'Titre en baisse d’environ 17 % sur un an malgré la croissance.'],
+      consensus: { buy: 6, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 38.77, price: 31.40, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "La thèse se confirme : chiffre d'affaires du 3e trimestre +44 % et objectifs 2026 relevés. Le titre a pris ~30 % depuis le relevé ; il reste ~23 % de potentiel vs l'objectif de 38,77 €. Conserver, sans renforcer après une telle hausse (ligne déjà à ~8,6 %)." },
+      facts: ['T3 2026 : CA 415,9 M€ (+44,3 %) ; croissance 2026 attendue désormais > 10 % à changes et périmètre constants (contre +8 %).', '15/10/2026 : +23 à +28 % en séance, meilleure séance en 25 ans. TP ICAP Midcap relève son objectif à 38 € (Achat), Portzamparc maintient 38 € (Achat).', 'Une société liée au président Olivier Ginon achète des titres (dont 12 000 le 15/10).', '02/10/2026 : concession du Lima Convention Center (Pérou).'],
+      risks: ['Après +30 % en quelques séances, le titre peut consolider.', 'Activité dépendante des grands événements ; endettement lié aux sites (Venues).'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPGLO/' }, { label: 'Convictions Portzamparc S2 2026', url: 'https://www.boursorama.com/bourse/actualites/valeurs-moyennes-les-8-convictions-de-portzamparc-pour-le-second-semestre-92b55c32855021abd2eebb70a1ca0b5f' }]
     },
     'FR0004159473': {
       yahoo: 'ALHEX.PA', name: 'Hexaom', ticker: 'ALHEX', kind: 'action', sector: 'Construction résidentielle', cap: 'Small cap',
       market: 'Euronext Growth', zones: { 'Europe': 1 },
-      consensus: { buy: 2, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 51.00, price: 20.20, priceDate: '2026-10-03' },
-      view: { label: 'Conserver', why: "Les 2 analystes qui suivent la valeur sont à l'achat. Le potentiel affiché (+150 %) repose sur une couverture très étroite : à prendre avec prudence. Ne pas moyenner à la baisse au-delà de ~7 % du portefeuille." },
+      consensus: { buy: 2, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 51.00, price: 22.30, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Remonte à 22,30 € (+10 % depuis le relevé). Les 2 analystes qui la suivent restent à l'achat (objectif 51 €), mais ce potentiel repose sur une couverture très étroite. Conserver sans moyenner à la baisse." },
       facts: ['S1 2026 : CA 343,9 M€ (+12,3 %), ROC 19,5 M€ (+59,8 %), RN part du groupe 12,6 M€ (+125 %).', 'Objectif 2026 : CA ~+20 % et marge opérationnelle > 5 %.', 'Consensus à 38,75 € en février 2026, relevé depuis.'],
       risks: ['Repli des ventes de maisons à l’été 2026 ; marché immobilier sensible aux taux.', 'Petite capitalisation peu liquide (Euronext Growth).'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPALHEX/' }]
@@ -89,19 +90,21 @@ window.PEA_RESEARCH = {
     'FR0000075442': {
       yahoo: 'ALLDL.PA', name: 'Groupe LDLC', ticker: 'ALLDL', kind: 'action', sector: 'Distribution informatique', cap: 'Small cap',
       market: 'Euronext Growth', zones: { 'Europe': 1 },
-      consensus: { buy: 1, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 16.20, price: 11.82, priceDate: '2026-10-02' },
-      view: { label: 'Conserver', why: 'Un seul analyste (TP ICAP Midcap, Achat, objectif 16,20 €). Rentabilité record sur 2025/26 et dividende de 0,73 € (~6 %), mais le 1er trimestre 2026/27 recule.' },
-      facts: ['Exercice 2025/26 : CA 554,1 M€ (+3,7 %), RN 10,2 M€ (record hors Covid).', 'T1 2026/27 : CA 109 M€ (-14,3 %), demande grand public prudente.', 'Dividende 0,73 € approuvé le 25/09/2026.'],
-      risks: ['Consensus fondé sur un seul analyste.', 'Cycle du matériel informatique grand public.'],
+      consensus: { buy: 1, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 16.20, price: 8.90, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Sous surveillance : −25 % depuis le relevé sans communiqué de la société, et l'unique objectif d'analyste (16,20 €, juin 2026) est sans doute dépassé. Ne pas renforcer avant le chiffre d'affaires du 29/10 ; la ligne ne pèse que ~3,6 %." },
+      facts: ['Octobre 2026 : de 11,82 € (02/10) à 8,30 € (15/10) puis 8,90 € (16/10), sans communiqué ; le dividende de 0,73 € détaché le 05/10 n’en explique qu’une partie. Environ −50 % depuis le 1er janvier.', 'Prochain chiffre d’affaires (T2 2026/27) annoncé pour le 29/10/2026.', 'Exercice 2025/26 : CA 554,1 M€ (+3,7 %), RN 10,2 M€ ; T1 2026/27 : CA −14,3 %.'],
+      risks: ['Un seul analyste, dont l’objectif date de juin 2026, avant la baisse.', 'Cycle du matériel informatique grand public.'],
+      events: [{ date: '2026-10-29', label: 'chiffre d’affaires du 2e trimestre 2026/27' }],
       sources: [{ label: 'Consensus Zonebourse', url: 'https://www.zonebourse.com/cours/action/GROUPE-LDLC-5107/consensus/' }]
     },
     'FR0000054231': {
       yahoo: 'HCO.PA', name: 'HighCo', ticker: 'HCO', kind: 'action', sector: 'Marketing & médias', cap: 'Micro cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 },
-      consensus: { buy: 2, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 4.50, price: 3.46, priceDate: '2026-10-03' },
-      view: { label: 'Conserver', why: "2 analystes à l'achat (objectif médian 4,50 €, ~30 % de potentiel) et rendement estimé ~7 %." },
-      facts: ['S1 2026 : marge brute 39,2 M€ (+26,7 %) avec l’intégration de Sogec et BudgetBox.', 'Objectif de marge opérationnelle ajustée 2026 relevé à ~13 %.', '11/09/2026 : Invest Securities relève son objectif à 4,60 € ; Oddo BHF à 5 €.'],
+      consensus: { buy: 3, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 4.70, price: 3.575, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "3 analystes à l'achat, objectif médian relevé à 4,70 € (~31 % de potentiel), rendement estimé ~7 %. La ligne ne pèse que ~1,5 % : la porter à ~5 % ou la céder." },
+      facts: ['Consensus : 3 analystes à l’achat, objectif médian relevé de 4,50 € à 4,70 €.', 'Chiffre d’affaires du 3e trimestre attendu le 20/10/2026.', 'S1 2026 : marge brute 39,2 M€ (+26,7 %) avec Sogec et BudgetBox ; marge opérationnelle ajustée visée ~13 %.'],
       risks: ['Retard du Retail Media ; objectif de marge brute 2026 légèrement abaissé.'],
+      events: [{ date: '2026-10-21', label: 'chiffre d’affaires du 3e trimestre (après la clôture)' }],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPHCO/' }]
     },
     'FR0013018041': {
@@ -117,17 +120,18 @@ window.PEA_RESEARCH = {
     'FR0005691656': {
       yahoo: 'TRI.PA', name: 'Trigano', ticker: 'TRI', kind: 'action', sector: 'Loisirs (camping-cars)', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 6, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.14, target: 188.71, price: 125.20, priceDate: '2026-10-03' },
-      per: [10.9, 10.1], yield: 2.3,
-      thesis: 'Leader européen des véhicules de loisirs, valorisation modeste (PER ~11) et consensus quasi unanime à l’achat.',
+      consensus: { buy: 7, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.13, target: 177.75, price: 128.90, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (1 titre). 8 analystes, quasi tous à l'achat, objectif médian 177,75 € (~40 % de potentiel) et PER ~9. Conserver ; un seul titre pèse déjà ~7 % du PEA." },
+      per: [8.9, null], yield: 3.1,
+      thesis: 'Leader européen des véhicules de loisirs, valorisation modeste (PER ~9) et consensus quasi unanime à l’achat (8 analystes). Objectif médian abaissé de 188,71 € à 177,75 €.',
       risks: ['Demande cyclique (pouvoir d’achat, taux) ; niveau des stocks chez les distributeurs.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPTRI/' }]
     },
     'FR0010929125': {
       yahoo: 'IDL.PA', name: 'ID Logistics', ticker: 'IDL', kind: 'action', sector: 'Logistique', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 6, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.14, target: 502, price: 313.50, priceDate: '2026-10-02' },
-      per: [29.6, 25.2], yield: 0,
+      consensus: { buy: 6, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.14, target: 506, price: 335.00, priceDate: '2026-10-16' },
+      per: [28.0, null], yield: 0,
       thesis: 'Logistique contractuelle (e-commerce, distribution) en croissance régulière, expansion aux États-Unis. 7 analystes positifs.',
       risks: ['Valorisation exigeante (PER ~30) ; marges structurellement fines.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPIDL/' }]
@@ -135,17 +139,18 @@ window.PEA_RESEARCH = {
     'FR0000121709': {
       yahoo: 'SK.PA', name: 'SEB', ticker: 'SK', kind: 'action', sector: 'Petit électroménager', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 7, outperform: 1, hold: 3, underperform: 0, sell: 0, median: 1.64, target: 74.41, price: 53.50, priceDate: '2026-10-03' },
-      per: [10.0, 7.4], yield: 4.9,
-      thesis: 'Leader mondial du petit équipement domestique, titre déprimé et rendement ~5 %. Conviction Portzamparc S2 2026 (objectif 99 €).',
+      consensus: { buy: 7, outperform: 1, hold: 3, underperform: 0, sell: 0, median: 1.64, target: 73.95, price: 57.80, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (3 titres). 8 avis positifs sur 11, objectif médian 73,95 € (~30 % de potentiel), PER ~10 et rendement ~5 %. Conserver." },
+      per: [10.2, null], yield: 4.9,
+      thesis: 'Leader mondial du petit équipement domestique, rendement ~5 % et PER ~10. Conviction Portzamparc S2 2026 (objectif 99 €).',
       risks: ['Consommation des ménages, droits de douane américains, concurrence chinoise.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPSK/' }]
     },
     'FR0000063737': {
       yahoo: 'AUB.PA', name: 'Aubay', ticker: 'AUB', kind: 'action', sector: 'Services informatiques', cap: 'Small cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 3, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.25, target: 68.08, price: 50.00, priceDate: '2026-10-02' },
-      per: [15.1, 14.1], yield: 2.6,
+      consensus: { buy: 3, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.25, target: 68.38, price: 49.45, priceDate: '2026-10-16' },
+      per: [13.2, null], yield: 3.0,
       thesis: 'ESN rentable au bilan sain, bien positionnée sur la banque-assurance en Europe. 4 analystes positifs.',
       risks: ['Ralentissement des budgets IT ; pression de l’IA générative sur la régie.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPAUB/' }]
@@ -153,8 +158,8 @@ window.PEA_RESEARCH = {
     'FR0000031577': {
       yahoo: 'VIRP.PA', name: 'Virbac', ticker: 'VIRP', kind: 'action', sector: 'Santé animale', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 6, outperform: 0, hold: 2, underperform: 0, sell: 0, median: 1.5, target: 411.88, price: 308.00, priceDate: '2026-10-02' },
-      per: [16.0, 14.5], yield: 0.5,
+      consensus: { buy: 5, outperform: 1, hold: 1, underperform: 0, sell: 0, median: 1.43, target: 412.43, price: 337.00, priceDate: '2026-10-16' },
+      per: [16.3, null], yield: 0.5,
       thesis: 'Santé animale : croissance régulière et profil défensif, peu corrélé au reste du portefeuille.',
       risks: ['Effets de change (pays émergents) ; intégration des acquisitions.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPVIRP/' }]
@@ -162,8 +167,9 @@ window.PEA_RESEARCH = {
     'FR0000038242': {
       yahoo: 'LBIRD.PA', name: 'Lumibird', ticker: 'LBIRD', kind: 'action', sector: 'Lasers & photonique', cap: 'Small cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 3, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 32.17, price: 23.80, priceDate: '2026-10-03' },
-      per: [28.9, 21.8], yield: 0,
+      consensus: { buy: 3, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 31.83, price: 22.60, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (4 titres). 3 analystes à l'achat, objectif médian 31,83 € (~40 % de potentiel), mais PER 2026e ~24 : valeur plus volatile. Conserver sans renforcer." },
+      per: [23.8, null], yield: 0,
       thesis: 'Lasers pour la défense, le médical et le lidar ; redressement opérationnel. Conviction Portzamparc S2 2026 (objectif 33,10 €).',
       risks: ['Valorisation 2026 élevée (PER ~29) ; exécution du redressement.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPLBIRD/' }]
@@ -171,8 +177,8 @@ window.PEA_RESEARCH = {
     'FR001400Q9V2': {
       yahoo: 'EXENS.PA', name: 'Exosens', ticker: 'EXENS', kind: 'action', sector: 'Défense (optronique)', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 7, outperform: 1, hold: 2, underperform: 0, sell: 0, median: 1.5, target: 67.60, price: 59.20, priceDate: '2026-10-02' },
-      per: [35.4, 28.7], yield: 0.5,
+      consensus: { buy: 8, outperform: 1, hold: 3, underperform: 0, sell: 0, median: 1.58, target: 69.42, price: 59.45, priceDate: '2026-10-16' },
+      per: [29.4, null], yield: 0.7,
       thesis: 'Vision nocturne et détection, portée par la hausse des budgets de défense européens. Une grande partie du potentiel est déjà dans le cours.',
       risks: ['Valorisation exigeante (PER ~35) ; dépendance aux commandes militaires.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPEXENS/' }]
@@ -180,13 +186,77 @@ window.PEA_RESEARCH = {
     'FR0000065484': {
       yahoo: 'LSS.PA', name: 'Lectra', ticker: 'LSS', kind: 'action', sector: 'Logiciels industriels', cap: 'Small cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
-      consensus: { buy: 3, outperform: 1, hold: 1, underperform: 0, sell: 0, median: 1.6, target: 23.90, price: 20.30, priceDate: '2026-10-03' },
-      per: [31.5, 25.0], yield: 1.5,
+      consensus: { buy: 3, outperform: 1, hold: 1, underperform: 0, sell: 0, median: 1.6, target: 24.20, price: 20.85, priceDate: '2026-10-16' },
+      per: [27.5, null], yield: 1.9,
       thesis: 'Logiciels et équipements de découpe pour la mode, l’automobile et l’ameublement ; modèle de plus en plus récurrent (SaaS).',
       risks: ['Potentiel limité (~18 %) ; secteurs clients cycliques.'],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPLSS/' }]
+    },
+
+    /* ------------------------------------------------- Idées ETF (PEA) */
+    'FR0013412020': {
+      yahoo: 'PAEEM.PA', name: 'Amundi PEA Émergent ESG Transition', short: 'ETF Pays émergents', ticker: 'PAEEM',
+      kind: 'etf', etfIdea: true, sector: 'Émergents diversifié', zones: { 'Pays émergents': 1 },
+      ter: 0.30, aum: 950, aumDate: '2026-10-16', replication: 'Synthétique', index: 'MSCI EM ESG Broad Transition (filtre ESG)',
+      price: 34.815, priceDate: '2026-10-20', perf1y: 23.0,
+      role: 'Ajoute les pays émergents (Chine, Inde, Taïwan, Corée…), absents de ton PEA.',
+      risks: ['Volatilité plus forte et risque politique ; indice filtré ESG, un peu différent du MSCI Emerging Markets classique.'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0013411980': {
+      yahoo: 'PTPXE.PA', name: 'Amundi PEA Japon (TOPIX)', short: 'ETF Japon', ticker: 'PTPXE',
+      kind: 'etf', etfIdea: true, sector: 'Japon diversifié', zones: { 'Asie-Pacifique': 1 },
+      ter: 0.20, aum: 210, aumDate: '2026-10-16', replication: 'Synthétique', index: 'TOPIX (≈ 1 700 sociétés japonaises)',
+      price: 39.625, priceDate: '2026-10-20', perf1y: 23.7,
+      role: 'Diversifie hors Europe et hors États-Unis, avec des frais bas.',
+      risks: ['Exposition au yen (non couverte) ; le Japon ne pèse qu’environ 5 % dans ton ETF Monde.'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0011871128': {
+      yahoo: 'PSP5.PA', name: 'Amundi PEA S&P 500', short: 'ETF S&P 500', ticker: 'PSP5',
+      kind: 'etf', etfIdea: true, sector: 'États-Unis diversifié', zones: { 'Amérique du Nord': 1 }, overlapCore: 70,
+      ter: 0.12, aum: 1540, aumDate: '2026-10-16', replication: 'Synthétique', index: 'S&P 500 (500 grandes sociétés américaines)',
+      price: 60.29, priceDate: '2026-10-20', perf1y: 17.1,
+      role: 'Exposition aux États-Unis parmi les moins chères du PEA.',
+      risks: ['Recoupe largement ton ETF Monde (≈ 70 % américain) ; dollar non couvert.'],
+      sources: [{ label: 'Liste ETF PEA (09/10/2026)', url: 'https://pea.fr/guides/etf-pea-eligibles-guide-complet-frais-encours/' }]
+    },
+    'LU1834986900': {
+      yahoo: 'HLT.PA', name: 'Amundi STOXX Europe 600 Healthcare', short: 'ETF Santé Europe', ticker: 'HLT',
+      kind: 'etf', etfIdea: true, sector: 'Santé', zones: { 'Europe': 1 }, defensive: true,
+      ter: 0.30, aum: 895, aumDate: '2025-12-31', replication: 'Synthétique', index: 'STOXX Europe 600 Health Care',
+      price: 155.34, priceDate: '2026-10-20', perf1y: 3.9,
+      role: 'Secteur défensif (Novo Nordisk, AstraZeneca, Roche…) qui équilibre l’énergie, l’industrie et la tech.',
+      risks: ['Concentré sur quelques géants pharmaceutiques ; une part coûte ~155 €.'],
+      sources: [{ label: 'Fiche ETF (francetransactions)', url: 'https://www.francetransactions.com/bourse/etf/amundi-stoxx-europe-600-hlthcare-etf-acc-lu1834986900.html' }]
+    },
+    'LU1598689153': {
+      yahoo: 'MMS.PA', name: 'Amundi MSCI EMU Small Cap ESG Broad Transition', short: 'ETF Small caps zone euro', ticker: 'MMS',
+      kind: 'etf', etfIdea: true, sector: 'Small caps zone euro', zones: { 'Europe': 1 }, smallcaps: true,
+      ter: 0.40, aum: 570, aumDate: '2026-10-16', replication: 'Physique (distribuant)', index: 'MSCI EMU Small Cap ESG Broad Transition',
+      price: 422.45, priceDate: '2026-10-20', perf1y: 6.0,
+      role: 'Petites et moyennes valeurs de la zone euro en une seule ligne, sans choisir de titres.',
+      risks: ['Part chère (~420 €) ; frais les plus élevés de la sélection ; performance indiquée hors dividendes (part distribuante).'],
+      sources: [{ label: 'Comparatif ETF PEA (16/10/2026)', url: 'https://www.epargnant30.fr/etf-pea/' }]
+    },
+    'FR0011871110': {
+      yahoo: 'PUST.PA', name: 'Amundi PEA Nasdaq-100', short: 'ETF Nasdaq-100', ticker: 'PUST',
+      kind: 'etf', etfIdea: true, sector: 'Technologie', zones: { 'Amérique du Nord': 1 }, overlapCore: 45, overlapSector: 'Technologie',
+      ter: 0.30, aum: 1340, aumDate: '2026-10-16', replication: 'Synthétique', index: 'Nasdaq-100',
+      price: 105.38, priceDate: '2026-10-20', perf1y: 20.2,
+      role: 'Croissance technologique américaine (Apple, Microsoft, Nvidia…).',
+      risks: ['Très concentré sur une dizaine de géants de la tech, déjà présents dans ton ETF Monde ; volatil.'],
+      sources: [{ label: 'Liste ETF PEA (09/10/2026)', url: 'https://pea.fr/guides/etf-pea-eligibles-guide-complet-frais-encours/' }]
     }
   },
+
+  /* ETF examinés mais écartés. */
+  excludedEtfs: [
+    { name: 'Amundi PEA Global (MSCI ACWI, GPEA)', reason: 'Lancé en juillet 2026, ~80 M€ d’encours : trop jeune. Ton ETF Monde couvre déjà les pays développés.' },
+    { name: 'Amundi MSCI World (CW8)', reason: 'Mêmes sociétés que ton ETF Monde, mais 0,38 % de frais contre 0,20 %.' },
+    { name: 'BNP Paribas Easy MSCI Europe Small Caps (LU1291101555)', reason: 'Non éligible au PEA selon plusieurs sources.' },
+    { name: 'Amundi Russell 2000 (RS2K)', reason: 'Petites valeurs américaines, part à ~370 € et frais de 0,35 % : pas prioritaire pour ce portefeuille.' }
+  ],
 
   /* Valeurs examinées mais écartées de la sélection, avec la raison. */
   excluded: [

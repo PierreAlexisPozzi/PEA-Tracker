@@ -12,6 +12,10 @@ Tableau de bord d'un PEA BoursoBank, publié comme artifact claude.ai privé :
 - Mise à jour quotidienne (routine du soir, jours ouvrés) : skill
   `.claude/skills/maj-quotidienne-pea/SKILL.md`. Elle écrit seulement dans la base de
   l'artifact (`quotes`, `alerts`, `research`, `analyses`) et ne modifie pas le dépôt.
+- Récapitulatif du matin (routine de 8 h 10, jours ouvrés) : skill
+  `.claude/skills/recap-matin-pea/SKILL.md`, en lecture seule. Envoi par un bot Telegram
+  si `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont définis dans l'environnement ; ne
+  jamais afficher ces valeurs.
 - Textes de l'interface en français, ton direct.
 
 ## Structure
@@ -23,6 +27,8 @@ Tableau de bord d'un PEA BoursoBank, publié comme artifact claude.ai privé :
 - `scripts/boursobank_to_json.py` : export BoursoBank vers document `snapshots/<date>`.
 - `scripts/daily_update.py` : cours du jour (Yahoo Finance, symbole `yahoo` des fiches),
   valorisation au cours du jour, alertes, rapport.
+- `scripts/morning_brief.py` : récapitulatif du matin (positions, à faire, à surveiller,
+  actualités) et envoi Telegram.
 
 ## Vérifier un changement
 

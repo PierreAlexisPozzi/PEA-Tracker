@@ -46,11 +46,17 @@ Pour chaque alerte de `alertes.json` : `ArtifactData` `update` de `alerts/<id>` 
 - chaque action détenue dont la variation du jour atteint 4 % ou dont une alerte s'est déclenchée ;
 - le lundi, toutes les actions détenues (pas les ETF, pas les titres radiés).
 
+Pour chaque valeur concernée, lire d'abord sa page d'actualités Boursorama avec `WebFetch`
+(`https://www.boursorama.com/cours/actualites/<code>/`, codes dans le skill `analyse-pea`) :
+elle liste les communiqués et le calendrier (publications, détachements). Si le titre bouge
+de 10 % ou plus, faire aussi une `WebSearch` en mode `extended`. Ne jamais écrire « sans
+explication » avant ces deux vérifications.
+
 Chercher l'explication avant de conclure : détachement de dividende, résultats,
 avertissement, changement de recommandation ou d'objectif. Une baisse égale au dividende
 détaché n'est pas une perte.
 
-## 4. Consensus (le lundi, ou si l'actualité signale un changement d'objectif)
+## 4. Consensus (chaque lundi, obligatoire ; aussi si l'actualité signale un changement d'objectif)
 
 Pour les actions détenues, lire le consensus Boursorama comme indiqué dans le skill
 `analyse-pea` (dernière colonne = état actuel ; recalculer le potentiel sur le cours du
