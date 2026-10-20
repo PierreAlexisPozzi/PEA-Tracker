@@ -69,6 +69,23 @@ Dans la page, la valorisation affichée devient « au cours du jour » : quantit
 relevé importé, cours de la routine. Importer un nouveau relevé reste nécessaire après un
 achat ou une vente. La procédure est décrite dans `.claude/skills/maj-quotidienne-pea`.
 
+### Récapitulatif du matin (WhatsApp)
+
+Une seconde routine tourne chaque jour ouvré à 8 h 10. Elle compose un message court :
+
+- valeur et variation de la séance ;
+- positions (poids, séance, +/- latente) ;
+- actions à faire et points à surveiller ;
+- publications de la semaine et actualités de la nuit.
+
+Le message part par WhatsApp via [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/)
+quand `CALLMEBOT_PHONE` et `CALLMEBOT_APIKEY` sont définis dans les secrets de
+l'environnement cloud. Sinon, il arrive par la notification de la routine.
+
+```bash
+python3 scripts/morning_brief.py --db-dir <dossier> [--news "Valeur : fait"] [--send]
+```
+
 ### Lecture du consensus
 
 Échelle FactSet affichée par Boursorama : 1 = Acheter, 2 = Renforcer, 3 = Conserver,

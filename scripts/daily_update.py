@@ -174,7 +174,16 @@ def eval_alert(alert: dict, v: dict):
         x = metric_of(line) if line else None
         return hit(x), x, [line["label"]] if line and hit(x) else []
     hits = [l for l in v["lines"] if not l["nonTradable"] and hit(metric_of(l))]
-    return bool(hits), (metric_of(hits[0]) if hits else None), [f"{l['label']} {metric_of(l):+.2f}" for l in hits]
+    return bool(hits), (metric_of(hits[0]) if hits else None), [f"{l['label']} {fmt_metric(metric_of(l), metric)}" for l in hits]
+
+
+def fmt_metric(x, metric):
+    """Valeur d'un indicateur d'alerte au format français (€ pour un cours, % sinon)."""
+    if metric in ("price", "total"):
+        return f"{fr(x, 2)} €"
+    if metric in ("pnlPct", "dayVar", "upside"):
+        return sfr(x, 1)
+    return f"{fr(x, 1)} %"
 
 
 # ---------------------------------------------------------------------- rapport
@@ -221,7 +230,7 @@ def alert_title(a, research):
     if a.get("scope") == "line":
         inst = research["instruments"].get(a.get("target"), {})
         who = inst.get("short") or inst.get("name") or a.get("target")
-    return f"{who} · {labels.get(a.get('metric'), a.get('metric'))} {'≥' if a.get('op') == '>=' else '≤'} {a.get('value')}"
+    return f"{who} · {labels.get(a.get('metric'), a.get('metric'))} {'≥' if a.get('op') == '>=' else '≤'} {fmt_metric(a.get('value'), a.get('metric'))}"
 
 
 def main() -> None:

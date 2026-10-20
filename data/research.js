@@ -10,6 +10,7 @@
  *
  * Mise à jour : modifier `asOf`, puis les blocs `consensus` concernés.
  * `yahoo` : symbole utilisé par scripts/daily_update.py pour le cours du jour.
+ * `events` : publications à venir ({ date, label }), reprises par le récapitulatif du matin.
  * Les mises à jour quotidiennes de la routine sont écrites dans la base de
  * l'artifact (collection `research`) et priment sur ce fichier.
  */
@@ -93,6 +94,7 @@ window.PEA_RESEARCH = {
       view: { label: 'Conserver', why: "Sous surveillance : −25 % depuis le relevé sans communiqué de la société, et l'unique objectif d'analyste (16,20 €, juin 2026) est sans doute dépassé. Ne pas renforcer avant le chiffre d'affaires du 29/10 ; la ligne ne pèse que ~3,6 %." },
       facts: ['Octobre 2026 : de 11,82 € (02/10) à 8,30 € (15/10) puis 8,90 € (16/10), sans communiqué ; le dividende de 0,73 € détaché le 05/10 n’en explique qu’une partie. Environ −50 % depuis le 1er janvier.', 'Prochain chiffre d’affaires (T2 2026/27) annoncé pour le 29/10/2026.', 'Exercice 2025/26 : CA 554,1 M€ (+3,7 %), RN 10,2 M€ ; T1 2026/27 : CA −14,3 %.'],
       risks: ['Un seul analyste, dont l’objectif date de juin 2026, avant la baisse.', 'Cycle du matériel informatique grand public.'],
+      events: [{ date: '2026-10-29', label: 'chiffre d’affaires du 2e trimestre 2026/27' }],
       sources: [{ label: 'Consensus Zonebourse', url: 'https://www.zonebourse.com/cours/action/GROUPE-LDLC-5107/consensus/' }]
     },
     'FR0000054231': {
@@ -102,6 +104,7 @@ window.PEA_RESEARCH = {
       view: { label: 'Conserver', why: "3 analystes à l'achat, objectif médian relevé à 4,70 € (~31 % de potentiel), rendement estimé ~7 %. La ligne ne pèse que ~1,5 % : la porter à ~5 % ou la céder." },
       facts: ['Consensus : 3 analystes à l’achat, objectif médian relevé de 4,50 € à 4,70 €.', 'Chiffre d’affaires du 3e trimestre attendu le 20/10/2026.', 'S1 2026 : marge brute 39,2 M€ (+26,7 %) avec Sogec et BudgetBox ; marge opérationnelle ajustée visée ~13 %.'],
       risks: ['Retard du Retail Media ; objectif de marge brute 2026 légèrement abaissé.'],
+      events: [{ date: '2026-10-20', label: 'chiffre d’affaires du 3e trimestre' }],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPHCO/' }]
     },
     'FR0013018041': {
@@ -118,6 +121,7 @@ window.PEA_RESEARCH = {
       yahoo: 'TRI.PA', name: 'Trigano', ticker: 'TRI', kind: 'action', sector: 'Loisirs (camping-cars)', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
       consensus: { buy: 7, outperform: 1, hold: 0, underperform: 0, sell: 0, median: 1.13, target: 177.75, price: 128.90, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (1 titre). 8 analystes, quasi tous à l'achat, objectif médian 177,75 € (~40 % de potentiel) et PER ~9. Conserver ; un seul titre pèse déjà ~7 % du PEA." },
       per: [8.9, null], yield: 3.1,
       thesis: 'Leader européen des véhicules de loisirs, valorisation modeste (PER ~9) et consensus quasi unanime à l’achat (8 analystes). Objectif médian abaissé de 188,71 € à 177,75 €.',
       risks: ['Demande cyclique (pouvoir d’achat, taux) ; niveau des stocks chez les distributeurs.'],
@@ -136,6 +140,7 @@ window.PEA_RESEARCH = {
       yahoo: 'SK.PA', name: 'SEB', ticker: 'SK', kind: 'action', sector: 'Petit électroménager', cap: 'Mid cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
       consensus: { buy: 7, outperform: 1, hold: 3, underperform: 0, sell: 0, median: 1.64, target: 73.95, price: 57.80, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (3 titres). 8 avis positifs sur 11, objectif médian 73,95 € (~30 % de potentiel), PER ~10 et rendement ~5 %. Conserver." },
       per: [10.2, null], yield: 4.9,
       thesis: 'Leader mondial du petit équipement domestique, rendement ~5 % et PER ~10. Conviction Portzamparc S2 2026 (objectif 99 €).',
       risks: ['Consommation des ménages, droits de douane américains, concurrence chinoise.'],
@@ -163,6 +168,7 @@ window.PEA_RESEARCH = {
       yahoo: 'LBIRD.PA', name: 'Lumibird', ticker: 'LBIRD', kind: 'action', sector: 'Lasers & photonique', cap: 'Small cap',
       market: 'Euronext Paris', zones: { 'Europe': 1 }, idea: true,
       consensus: { buy: 3, outperform: 0, hold: 0, underperform: 0, sell: 0, median: 1, target: 31.83, price: 22.60, priceDate: '2026-10-16' },
+      view: { label: 'Conserver', why: "Détenue depuis le 20/10 (4 titres). 3 analystes à l'achat, objectif médian 31,83 € (~40 % de potentiel), mais PER 2026e ~24 : valeur plus volatile. Conserver sans renforcer." },
       per: [23.8, null], yield: 0,
       thesis: 'Lasers pour la défense, le médical et le lidar ; redressement opérationnel. Conviction Portzamparc S2 2026 (objectif 33,10 €).',
       risks: ['Valorisation 2026 élevée (PER ~29) ; exécution du redressement.'],
