@@ -104,7 +104,7 @@ window.PEA_RESEARCH = {
       view: { label: 'Conserver', why: "3 analystes à l'achat, objectif médian relevé à 4,70 € (~31 % de potentiel), rendement estimé ~7 %. La ligne ne pèse que ~1,5 % : la porter à ~5 % ou la céder." },
       facts: ['Consensus : 3 analystes à l’achat, objectif médian relevé de 4,50 € à 4,70 €.', 'Chiffre d’affaires du 3e trimestre attendu le 20/10/2026.', 'S1 2026 : marge brute 39,2 M€ (+26,7 %) avec Sogec et BudgetBox ; marge opérationnelle ajustée visée ~13 %.'],
       risks: ['Retard du Retail Media ; objectif de marge brute 2026 légèrement abaissé.'],
-      events: [{ date: '2026-10-20', label: 'chiffre d’affaires du 3e trimestre' }],
+      events: [{ date: '2026-10-21', label: 'chiffre d’affaires du 3e trimestre (après la clôture)' }],
       sources: [{ label: 'Consensus Boursorama', url: 'https://www.boursorama.com/cours/consensus/1rPHCO/' }]
     },
     'FR0013018041': {

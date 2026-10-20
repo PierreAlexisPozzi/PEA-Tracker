@@ -237,11 +237,12 @@ def send_telegram(text: str):
     for i, part in enumerate(split(text), 1):
         body = post(url, {"chat_id": chat, "text": part, "parse_mode": "HTML",
                           "link_preview_options": {"is_disabled": True}})
-        if not body.get("ok") and "parse" in str(body.get("description", "")).lower():
+        plain = not body.get("ok") and "parse" in str(body.get("description", "")).lower()
+        if plain:
             body = post(url, {"chat_id": chat, "text": to_plain(part), "link_preview_options": {"is_disabled": True}})
         ok = body.get("ok") is True
         detail = "" if ok else f" ({str(body.get('description', '')).replace(token, '***')[:160]})"
-        print(f"Telegram partie {i} : {'envoyée' if ok else 'échec'}{detail}", file=sys.stderr)
+        print(f"Telegram partie {i} : {'envoyée' if ok else 'échec'}{' en texte simple' if plain else ''}{detail}", file=sys.stderr)
         ok_all = ok_all and ok
     return ok_all
 
