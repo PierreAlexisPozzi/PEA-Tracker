@@ -34,9 +34,11 @@ recommandation ou d'objectif. Pour une valeur absente du tableau des codes, fair
 
 ```bash
 python3 scripts/morning_brief.py --db-dir <scratchpad>/db --send --out <scratchpad>/recap.txt \
-  --news "Valeur : fait" --news "…"
+  --news-checked --news "Valeur : fait" --news "…"
 ```
 
+- `--news-checked` indique que les actualités ont été relues : sans ligne `--news`, le
+  message dit « Rien de notable ». L'omettre si la lecture des pages a échoué.
 - Le script compose le message et l'envoie par le bot Telegram si `TELEGRAM_BOT_TOKEN` et
   `TELEGRAM_CHAT_ID` sont définis dans l'environnement.
 - Ne jamais afficher ni recopier ces valeurs.
@@ -47,8 +49,8 @@ python3 scripts/morning_brief.py --db-dir <scratchpad>/db --send --out <scratchp
 ## 4. Message final
 
 C'est le texte de la notification de la routine :
-- Telegram envoyé : une ligne, « Récap envoyé sur Telegram », suivie de la valeur et du
-  nombre d'actions à faire.
+- Telegram envoyé : « Récap envoyé sur Telegram : » suivi de la ligne `Résumé :` affichée
+  par le script, recopiée telle quelle (valeur, nombre d'actions et de points à surveiller).
 - Sinon : le contenu de `recap.txt` tel quel.
 
 Aide à la décision uniquement : ne jamais passer d'ordre.

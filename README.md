@@ -73,10 +73,10 @@ achat ou une vente. La procédure est décrite dans `.claude/skills/maj-quotidie
 
 Une seconde routine tourne chaque jour ouvré à 8 h 10. Elle compose un message court :
 
-- valeur et variation de la séance ;
-- positions (poids, séance, +/- latente) ;
-- actions à faire et points à surveiller ;
-- publications de la semaine et actualités de la nuit.
+- valeur, variation de la séance, meilleure et pire ligne ;
+- actions à faire, puis points à surveiller (alertes, publications de la semaine) ;
+- actualités de la nuit ;
+- positions (poids, séance, +/- latente), dans un bloc repliable.
 
 Le message part par un bot Telegram quand `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont
 définis dans les variables de l'environnement cloud. Sinon, il arrive par la notification
