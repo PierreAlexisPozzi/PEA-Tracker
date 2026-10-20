@@ -71,6 +71,7 @@
     ctrlFilter: 'all',
     ideaSort: 'score',
     ideaKind: 'all',
+    showUnfollowed: (() => { try { return localStorage.getItem(LS_KEY + ':showUnfollowed') !== '0'; } catch (e) { return true; } })(),
     readOnly: false,
     awaitId: null,
     pending: null,
@@ -967,6 +968,28 @@
       (s.stale.length ? ' Cours non mis à jour : ' + esc(s.stale.join(', ')) + '.' : '') + '</span></div>';
   }
 
+  /* ---------------- Filtre des valeurs plus suivies (titres radiés ou non négociables) */
+
+  const isUnfollowed = (isin) => !!(inst(isin) || {}).nonTradable;
+  const showUnfollowed = () => S.showUnfollowed !== false;
+  function visible(lines) { return showUnfollowed() ? lines : lines.filter((l) => !isUnfollowed(l.isin)); }
+
+  function unfollowedToggle(lines) {
+    const n = lines.filter((l) => isUnfollowed(l.isin)).length;
+    if (!n) return '';
+    const shown = showUnfollowed();
+    return '<button class="seg" type="button" data-act="toggle-unfollowed" aria-pressed="' + !shown + '">' + (shown ? 'Masquer' : 'Afficher') + ' les valeurs plus suivies (' + n + ')</button>';
+  }
+
+  function unfollowedNote(lines) {
+    if (showUnfollowed()) return '';
+    const hid = lines.filter((l) => isUnfollowed(l.isin));
+    if (!hid.length) return '';
+    const pl = hid.length > 1;
+    return '<p class="small muted">' + hid.length + ' valeur' + (pl ? 's' : '') + ' plus suivie' + (pl ? 's' : '') + ' masquée' + (pl ? 's' : '') + ' : ' +
+      esc(hid.map((l) => l.label + (ok(l.value) ? ' (' + eur(l.value) + ')' : '')).join(', ')) + '. ' + (pl ? 'Elles restent comptées' : 'Elle reste comptée') + ' dans les totaux et les contrôles.</p>';
+  }
+
   function demoBanner() {
     return S.demo ? '<div class="banner"><span><b>Exemple fictif.</b> Ces positions ne sont pas les vôtres.</span><button class="btn sm" type="button" data-act="exit-demo">Quitter l’exemple</button></div>' : '';
   }
@@ -997,7 +1020,7 @@
     const nW = C.filter((c) => c.status === 'warn').length;
     const nO = C.filter((c) => c.status === 'ok').length;
     const todo = C.filter((c) => (c.status === 'alert' || c.status === 'warn') && c.action).sort((a, b) => (a.status === 'alert' ? 0 : 1) - (b.status === 'alert' ? 0 : 1)).slice(0, 5);
-    const lines = A.lines.slice().sort((a, b) => b.value - a.value);
+    const lines = visible(A.lines).slice().sort((a, b) => b.value - a.value);
     const kpi = '<div class="kpis">' +
       '<div class="kpi"><span class="label">Valeur du PEA</span><span class="value hero num">' + eur(A.total, 0) + '</span><span class="sub">' + (A.cash ? 'dont ' + eur(A.cash, 0) + ' de liquidités' : 'hors liquidités (non incluses dans l’export)') + '</span></div>' +
       '<div class="kpi"><span class="label">+/- value latente</span><span class="value num ' + tone(A.pnl) + '">' + sEur(A.pnl, 0) + '</span><span class="sub num">' + sPct(A.pnlPct) + ' sur ' + eur(A.cost, 0) + ' investis</span></div>' +
@@ -1022,9 +1045,10 @@
       '<p class="small muted">En orange : au-dessus du seuil d’alerte sectoriel (' + S.settings.sectorAlert + ' %).</p></div>';
 
     const pnl = '<div class="card section"><div class="section-head"><h2>Performance par ligne</h2><div class="legend"><span><i style="background:var(--gain)"></i>Plus-value</span><span><i style="background:var(--loss)"></i>Moins-value</span></div></div>' +
-      dbars(A.lines.slice().sort((a, b) => b.pnlPct - a.pnlPct).map((l) => ({ label: l.label, value: l.pnlPct, tip: '<b>' + esc(l.label) + '</b><br>' + sPct(l.pnlPct) + ' · ' + sEur(l.pnl) + '<br>PRU ' + eur(l.pru) + ' → cours ' + eur(l.last) }))) + '</div>';
+      (unfollowedToggle(A.lines) ? '<div class="filter-row">' + unfollowedToggle(A.lines) + '</div>' : '') +
+      dbars(visible(A.lines).slice().sort((a, b) => b.pnlPct - a.pnlPct).map((l) => ({ label: l.label, value: l.pnlPct, tip: '<b>' + esc(l.label) + '</b><br>' + sPct(l.pnlPct) + ' · ' + sEur(l.pnl) + '<br>PRU ' + eur(l.pru) + ' → cours ' + eur(l.last) }))) + unfollowedNote(A.lines) + '</div>';
 
-    const analysts = '<div class="section"><div class="section-head"><h2>Ce que disent les analystes sur vos lignes</h2>' + ABAR_LEGEND + '</div>' +
+    const analysts = '<div class="section"><div class="section-head"><h2>Ce que disent les analystes sur vos lignes</h2>' + ABAR_LEGEND + unfollowedToggle(A.lines) + '</div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th>Avis des analystes</th><th>Répartition</th><th class="r">Objectif</th><th class="r">Potentiel</th><th>Avis de synthèse</th></tr></thead><tbody>' +
       lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><div class="name-cell"><b>' + esc(l.label) + '</b><span>' + esc(l.m.sector || '') + '</span></div></td>' +
         '<td>' + (l.call ? recoPill(l.call.label, l.call.cls) + ' <span class="small muted">' + esc(l.call.strength) + (l.call.thin ? ', ' + l.call.n + ' analyste' + (l.call.n > 1 ? 's' : '') : '') + '</span>' : '<span class="small muted">' + (l.m.kind === 'etf' ? 'ETF : pas de consensus' : l.m.nonTradable ? 'Plus suivie' : 'Non couvert') + '</span>') + '</td>' +
@@ -1032,7 +1056,7 @@
         '<td class="r">' + (l.m.consensus && !l.m.nonTradable ? eur(l.m.consensus.target) : '—') + '</td>' +
         '<td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
-      '</tbody></table></div><p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
+      '</tbody></table></div>' + unfollowedNote(A.lines) + '<p class="note">« Renforcer » regroupe les avis Acheter et Renforcer (note médiane ≤ 2,5 sur l’échelle FactSet 1-5). L’avis de synthèse tient compte du poids de la ligne et des doublons. Cliquez sur une ligne pour le détail et les sources.</p></div>';
 
     return demoBanner() + updateCard() + quotesBanner(A) + analysisTeaser() + kpi + '<div class="grid-2">' + health + types + '</div>' + analysts + '<div class="grid-2">' + sectors + pnl + '</div>';
   }
@@ -1044,10 +1068,10 @@
     const k = S.posSort.key;
     const d = S.posSort.dir;
     const val = (l) => ({ label: l.label, qty: l.qty, pru: l.pru, last: l.last, dayVar: l.dayVar, value: l.value, weight: l.weight, pnl: l.pnl, pnlPct: l.pnlPct, upside: l.upside == null ? -Infinity : l.upside })[k];
-    const lines = A.lines.slice().sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; });
+    const lines = visible(A.lines).slice().sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; });
     const th = (key, label, r) => '<th class="' + (r ? 'r' : '') + '" aria-sort="' + (k === key ? (d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + key + '">' + label + (k === key ? (d > 0 ? ' ↑' : ' ↓') : '') + '</button></th>';
     const maxW = Math.max(S.settings.lineAlert, Math.max.apply(null, A.lines.map((l) => l.weight)));
-    return demoBanner() + quotesBanner(A) + '<div class="section"><div class="section-head"><h2>Positions</h2><span class="muted small">Cliquez sur une ligne pour sa fiche.</span></div>' +
+    return demoBanner() + quotesBanner(A) + '<div class="section"><div class="section-head"><h2>Positions</h2><div class="actions"><span class="muted small">Cliquez sur une ligne pour sa fiche.</span>' + unfollowedToggle(A.lines) + '</div></div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + th('label', 'Ligne') + th('qty', 'Qté', 1) + th('pru', 'PRU', 1) + th('last', 'Cours', 1) + th('dayVar', 'Jour', 1) + th('value', 'Valeur', 1) + th('weight', 'Poids') + th('pnl', '+/- value', 1) + th('pnlPct', '%', 1) + '<th>Analystes</th>' + th('upside', 'Potentiel', 1) + '<th>Avis</th></tr></thead><tbody>' +
       lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '">' +
         '<td><div class="name-cell"><b>' + esc(l.label) + '</b><span>' + esc(l.isin) + ' · ' + esc(l.m.kind === 'etf' ? 'ETF' : (l.m.market || 'Action')) + '</span></div></td>' +
@@ -1058,7 +1082,7 @@
         '<td>' + (l.call ? recoPill(l.call.label, l.call.cls) : '<span class="small muted">—</span>') + '</td>' +
         '<td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.m.view ? recoPill(l.m.view.label) : '<span class="reco r-none">À étudier</span>') + '</td></tr>').join('') +
-      '</tbody><tfoot><tr><td>Total' + (A.cash ? ' (dont liquidités ' + eur(A.cash, 0) + ')' : '') + '</td><td></td><td></td><td></td><td class="r ' + tone(A.day) + '">' + sEur(A.day) + '</td><td class="r">' + eur(A.total) + '</td><td>100 %</td><td class="r ' + tone(A.pnl) + '">' + sEur(A.pnl) + '</td><td class="r ' + tone(A.pnlPct) + '">' + sPct(A.pnlPct) + '</td><td></td><td></td><td></td></tr></tfoot></table></div>' +
+      '</tbody><tfoot><tr><td>Total' + (A.cash ? ' (dont liquidités ' + eur(A.cash, 0) + ')' : '') + '</td><td></td><td></td><td></td><td class="r ' + tone(A.day) + '">' + sEur(A.day) + '</td><td class="r">' + eur(A.total) + '</td><td>100 %</td><td class="r ' + tone(A.pnl) + '">' + sEur(A.pnl) + '</td><td class="r ' + tone(A.pnlPct) + '">' + sPct(A.pnlPct) + '</td><td></td><td></td><td></td></tr></tfoot></table></div>' + unfollowedNote(A.lines) +
       '<p class="note">Potentiel = objectif moyen des analystes ÷ cours du relevé − 1. Barre orange : ligne au-dessus du seuil de vigilance (' + S.settings.lineWarn + ' %, ETF diversifiés exclus).</p></div>';
   }
 
@@ -1599,11 +1623,11 @@
       '<div class="card section"><h2>Plan d’action</h2>' + (view.actions.length ? '<ol class="plain">' + view.actions.map((a) => '<li>' + lvl(a.level) + ' <b>' + esc(a.title) + '</b> : ' + esc(a.text) + '</li>').join('') + '</ol>' : '<p class="muted">Rien d’urgent : vos seuils sont respectés.</p>') +
       '<p class="small"><b>Prochain versement :</b> ' + esc(view.nextMoney) + '</p></div></div>' +
       '<div class="card section" id="claudeBox" aria-live="polite">' + claudeInner(view) + '</div>' +
-      '<div class="section"><h2>Ligne par ligne</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th class="r">Poids</th><th class="r">+/- %</th><th>Analystes</th><th class="r">Potentiel</th><th>Avis</th><th>Commentaire</th></tr></thead><tbody>' +
-      view.lines.map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><b>' + esc(l.label) + '</b></td><td class="r">' + pct(l.weight) + '</td><td class="r ' + tone(l.pnlPct) + '">' + sPct(l.pnlPct) + '</td>' +
+      '<div class="section"><div class="section-head"><h2>Ligne par ligne</h2>' + unfollowedToggle(view.lines) + '</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ligne</th><th class="r">Poids</th><th class="r">+/- %</th><th>Analystes</th><th class="r">Potentiel</th><th>Avis</th><th>Commentaire</th></tr></thead><tbody>' +
+      visible(view.lines).map((l) => '<tr class="clickable" data-detail="' + esc(l.isin) + '"><td><b>' + esc(l.label) + '</b></td><td class="r">' + pct(l.weight) + '</td><td class="r ' + tone(l.pnlPct) + '">' + sPct(l.pnlPct) + '</td>' +
         '<td>' + (l.analysts ? recoPill(l.analysts) + ' <span class="small muted">' + l.analystsN + '</span>' : '<span class="small muted">—</span>') + '</td><td class="r ' + tone(l.upside) + '">' + sPct(l.upside) + '</td>' +
         '<td>' + (l.view ? recoPill(l.view) : '<span class="reco r-none">À étudier</span>') + '</td><td class="small">' + esc(l.note) + '</td></tr>').join('') +
-      '</tbody></table></div></div>' +
+      '</tbody></table></div>' + unfollowedNote(view.lines) + '</div>' +
       '<p class="note">Une analyse est créée automatiquement à chaque import (et Claude rédige un commentaire si l’option est active dans Réglages). « Nouvelle analyse » en refait une à tout moment. Pour une analyse avec consensus rafraîchis sur le web, demandez-la à Claude dans une conversation.</p>';
   }
 
@@ -1850,6 +1874,16 @@
         case 'parse-paste': return handlePaste();
         case 'commit': return commitImport();
         case 'close': return closeSheet();
+        case 'toggle-unfollowed': {
+          S.showUnfollowed = !showUnfollowed();
+          try { localStorage.setItem(LS_KEY + ':showUnfollowed', S.showUnfollowed ? '1' : '0'); } catch (err) { /* préférence non mémorisée */ }
+          const idx = Array.from(document.querySelectorAll('#panel-' + S.tab + ' [data-act="toggle-unfollowed"]')).indexOf(t);
+          renderAll();
+          const again = document.querySelectorAll('#panel-' + S.tab + ' [data-act="toggle-unfollowed"]')[Math.max(0, idx)];
+          if (again) again.focus();
+          toast(S.showUnfollowed ? 'Valeurs plus suivies affichées.' : 'Valeurs plus suivies masquées (toujours comptées dans les totaux).');
+          return;
+        }
         case 'demo': S.demo = demoSnapshot(); return renderAll();
         case 'exit-demo': S.demo = null; return renderAll();
         case 'reset-settings': {

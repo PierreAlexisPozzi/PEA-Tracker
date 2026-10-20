@@ -32,7 +32,7 @@ les alertes.
 |---|---|
 | Synthèse | Zone « Mettre à jour mon relevé », dernière analyse, valeur, +/- value (avec et sans titres radiés), indice de santé, actions prioritaires, répartition, performance par ligne, avis des analystes |
 | Analyse | Rapport créé à chaque import ou à la demande : ce qui a changé, plan d'action, prochain versement, commentaire ligne par ligne, commentaire rédigé par Claude ; historique des analyses |
-| Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne |
+| Positions | Tableau triable, poids par ligne, consensus, potentiel vs objectif, fiche détaillée par ligne. Un bouton masque ou affiche les valeurs plus suivies (titres radiés), aussi dans la Synthèse et l'Analyse ; elles restent comptées dans les totaux |
 | Contrôles | 22 contrôles en vert / orange / rouge : qualité du relevé, concentration, pertes, titres radiés, socle diversifié, doublons titres/ETF, analystes, cadre PEA |
 | Alertes | Seuils sur le cours, la +/- value, le poids, la variation du jour, le potentiel, un secteur ou le portefeuille ; alertes recommandées en un clic |
 | Flux | Chaîne de traitement d'un relevé, évolution de la valeur, plafond des versements (150 000 €), journal des mouvements, relevés enregistrés |
