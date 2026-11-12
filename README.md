@@ -63,7 +63,8 @@ clôture d'Euronext. Elle :
 - évalue les alertes ;
 - cherche l'actualité des lignes qui bougent ;
 - le lundi, rafraîchit les consensus des analystes ;
-- écrit un « point du jour » et envoie une notification.
+- écrit un « point du jour » dans la page et l'envoie sur Telegram (même bot que le
+  récapitulatif du matin, `scripts/send_telegram.py`), avec une notification d'une ligne.
 
 Dans la page, la valorisation affichée devient « au cours du jour » : quantités du dernier
 relevé importé, cours de la routine. Importer un nouveau relevé reste nécessaire après un

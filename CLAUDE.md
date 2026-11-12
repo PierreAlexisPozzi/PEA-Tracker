@@ -11,7 +11,8 @@ Tableau de bord d'un PEA BoursoBank, publié comme artifact claude.ai privé :
   `.claude/skills/analyse-pea/SKILL.md`.
 - Mise à jour quotidienne (routine du soir, jours ouvrés) : skill
   `.claude/skills/maj-quotidienne-pea/SKILL.md`. Elle écrit seulement dans la base de
-  l'artifact (`quotes`, `alerts`, `research`, `analyses`) et ne modifie pas le dépôt.
+  l'artifact (`quotes`, `alerts`, `research`, `analyses`), ne modifie pas le dépôt et
+  envoie le point du soir sur Telegram (`scripts/send_telegram.py`).
 - Récapitulatif du matin (routine de 8 h 10, jours ouvrés) : skill
   `.claude/skills/recap-matin-pea/SKILL.md`, en lecture seule. Envoi par un bot Telegram
   si `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont définis dans l'environnement ; ne
