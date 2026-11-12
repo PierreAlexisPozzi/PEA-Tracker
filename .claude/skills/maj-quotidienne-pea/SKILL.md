@@ -119,7 +119,8 @@ Puis l'envoyer :
 python3 scripts/send_telegram.py <scratchpad>/soir.html
 ```
 
-Ne jamais afficher `TELEGRAM_BOT_TOKEN` ni `TELEGRAM_CHAT_ID`. Code de sortie 2 : l'envoi a
+Ne jamais afficher `TELEGRAM_BOT_TOKEN` ni `TELEGRAM_CHAT_ID`, ni tester leur présence
+avec `echo` : le script dit lui-même si Telegram est configuré. Code de sortie 2 : l'envoi a
 échoué, le signaler dans le message final avec la raison affichée.
 
 ## 7. Message final
