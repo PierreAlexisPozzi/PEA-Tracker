@@ -1,6 +1,6 @@
 ---
 name: maj-quotidienne-pea
-description: Mise à jour quotidienne du PEA Tracker exécutée par la routine du soir (jours ouvrés, après la clôture d'Euronext) — cours du jour, valorisation, alertes, actualités et, le lundi, consensus des analystes, enregistrés dans l'artifact. À utiliser quand une routine ou l'utilisateur demande la mise à jour quotidienne, les cours du jour ou le point du jour du PEA.
+description: Mise à jour quotidienne du PEA Tracker exécutée par la routine du soir (jours ouvrés, après la clôture d'Euronext) — cours du jour, valorisation, alertes, actualités et, le lundi, consensus des analystes, enregistrés dans l'artifact, puis point du soir envoyé sur Telegram. À utiliser quand une routine ou l'utilisateur demande la mise à jour quotidienne, les cours du jour ou le point du jour du PEA.
 ---
 
 # Mise à jour quotidienne du PEA
@@ -46,11 +46,17 @@ Pour chaque alerte de `alertes.json` : `ArtifactData` `update` de `alerts/<id>` 
 - chaque action détenue dont la variation du jour atteint 4 % ou dont une alerte s'est déclenchée ;
 - le lundi, toutes les actions détenues (pas les ETF, pas les titres radiés).
 
+Pour chaque valeur concernée, lire d'abord sa page d'actualités Boursorama avec `WebFetch`
+(`https://www.boursorama.com/cours/actualites/<code>/`, codes dans le skill `analyse-pea`) :
+elle liste les communiqués et le calendrier (publications, détachements). Si le titre bouge
+de 10 % ou plus, faire aussi une `WebSearch` en mode `extended`. Ne jamais écrire « sans
+explication » avant ces deux vérifications.
+
 Chercher l'explication avant de conclure : détachement de dividende, résultats,
 avertissement, changement de recommandation ou d'objectif. Une baisse égale au dividende
 détaché n'est pas une perte.
 
-## 4. Consensus (le lundi, ou si l'actualité signale un changement d'objectif)
+## 4. Consensus (chaque lundi, obligatoire ; aussi si l'actualité signale un changement d'objectif)
 
 Pour les actions détenues, lire le consensus Boursorama comme indiqué dans le skill
 `analyse-pea` (dernière colonne = état actuel ; recalculer le potentiel sur le cours du
@@ -84,16 +90,52 @@ nouveaux cours) et passer sa `version` en `if_version`.
 `claude.text` : 250 mots au plus, sections `## Synthèse du jour`, `## Cours`, `## Alertes`,
 `## Actualités`, `## À faire`. Uniquement des faits vérifiés, chiffres du rapport à l'appui.
 
-## 6. Message final
+## 6. Point du soir sur Telegram
+
+Écrire le point du soir dans `<scratchpad>/soir.html`, au format HTML de Telegram (balises
+`<b>`, `<i>`, `<a href>` seulement ; échapper `&`, `<`, `>` dans le texte), 900 caractères
+au plus, une icône par section, une section vide est omise :
+
+```
+🌙 <b>PEA · clôture du <jour JJ/MM></b>
+💼 <b><valeur> €</b> · séance <±x €> (<±x,x %>)
+🏁 Meilleure séance : <ligne> (<±x,x %>) · pire : <ligne> (<±x,x %>)
+
+🔔 <b>Alertes</b>
+• <ligne> <valeur> (<indicateur>, seuil <seuil>).
+
+📰 <b>Actualités</b>
+• <Valeur> : <fait, une phrase>.
+
+✅ <b>À envisager</b>
+• <action, une phrase>.
+
+🔗 <a href="https://claude.ai/artifact/S5JWYoC7fjJWVPFwLKjNjm">Ouvrir PEA Tracker</a>
+```
+
+Puis l'envoyer :
+
+```bash
+python3 scripts/send_telegram.py <scratchpad>/soir.html
+```
+
+Ne jamais afficher `TELEGRAM_BOT_TOKEN` ni `TELEGRAM_CHAT_ID`, ni tester leur présence
+avec `echo` : le script dit lui-même si Telegram est configuré. Code de sortie 2 : l'envoi a
+échoué, le signaler dans le message final avec la raison affichée.
+
+## 7. Message final
 
 C'est le texte de la notification : la routine l'envoie elle-même, ne pas appeler
-`PushNotification`. 4 lignes au plus, en français.
-1. Valeur au cours du jour et variation de la séance.
-2. Alertes déclenchées, s'il y en a.
-3. Actualité importante, s'il y en a.
-4. Action à envisager, s'il y en a.
+`PushNotification`.
+- Point envoyé sur Telegram : une ligne, « Point du soir envoyé sur Telegram : <valeur> €
+  (séance <±x €>) », plus les alertes déclenchées s'il y en a.
+- Sinon (Telegram non configuré ou en échec), 4 lignes au plus, en français :
+  1. Valeur au cours du jour et variation de la séance.
+  2. Alertes déclenchées, s'il y en a.
+  3. Actualité importante, s'il y en a.
+  4. Action à envisager, s'il y en a.
 
-Une journée sans événement tient en une ligne.
+  Une journée sans événement tient en une ligne.
 
 Aide à la décision uniquement : ne jamais passer d'ordre ni présenter un avis comme un
 conseil personnalisé.
